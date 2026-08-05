@@ -1,7 +1,10 @@
-import type { BandPreset } from "./types";
 import { DEMO_FSK_FREQUENCY_HZ } from "./fsk/types";
 import { DEMO_FT8_FREQUENCY_HZ } from "./ft8/types";
+import { GMRS_CALLING_CHANNEL } from "./gmrs/channels";
 import { DEMO_MORSE_FREQUENCY_HZ } from "./morse/types";
+import { DEMO_P25_FREQUENCY_HZ } from "./p25/types";
+import type { BandPreset } from "./types";
+import { DEMO_WEFAX_FREQUENCY_HZ } from "./wefax/types";
 
 export const BAND_PRESETS: BandPreset[] = [
   { id: "fm-885", label: "FM 88.5", frequencyHz: 88_500_000, scheme: "WBFM" },
@@ -11,6 +14,18 @@ export const BAND_PRESETS: BandPreset[] = [
   { id: "2m", label: "2m 146.52", frequencyHz: 146_520_000, scheme: "NBFM" },
   { id: "wx", label: "WX 162.55", frequencyHz: 162_550_000, scheme: "NBFM" },
   { id: "70cm", label: "70cm 446.0", frequencyHz: 446_000_000, scheme: "NBFM" },
+  {
+    id: "gmrs-20",
+    label: `GMRS ${GMRS_CALLING_CHANNEL.channel}`,
+    frequencyHz: GMRS_CALLING_CHANNEL.frequencyHz,
+    scheme: "NBFM",
+  },
+  {
+    id: "gmrs-15",
+    label: "GMRS 15",
+    frequencyHz: 462_550_000,
+    scheme: "NBFM",
+  },
   { id: "am-810", label: "AM 810", frequencyHz: 810_000, scheme: "AM" },
   { id: "20m", label: "20m 14.225", frequencyHz: 14_225_000, scheme: "USB" },
   {
@@ -30,6 +45,18 @@ export const BAND_PRESETS: BandPreset[] = [
     label: "FT8 14.074",
     frequencyHz: DEMO_FT8_FREQUENCY_HZ,
     scheme: "USB",
+  },
+  {
+    id: "wefax-demo",
+    label: "Fax 12.625",
+    frequencyHz: DEMO_WEFAX_FREQUENCY_HZ,
+    scheme: "USB",
+  },
+  {
+    id: "p25-demo",
+    label: "P25 851.0125",
+    frequencyHz: DEMO_P25_FREQUENCY_HZ,
+    scheme: "NBFM",
   },
 ];
 

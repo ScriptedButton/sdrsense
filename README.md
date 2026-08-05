@@ -25,13 +25,21 @@ Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick
 - Demodulation: WBFM, NBFM, AM, USB, LSB, CW
 - Frequency, offset, gain (AGC/manual), volume, bandwidth, squelch / auto-squelch
 - Band presets and demo mode with simulated signals
+- GMRS channel presets (1–22 + repeater inputs) and GMRS callsign lookup (FCC via Skywave)
 - Live transcription of demodulated audio (Whisper tiny.en, in-browser)
 - Morse / CW decoder on demod audio — tone or envelope detection, fixed or auto WPM, with keyword / Q-code / callsign identification
+- Callsign lookup — amateur (HamDB + Callook) or GMRS (Skywave / FCC); click a callsign in Morse decode to open it
 - FSK / RTTY decoder (Baudot & ASCII) on demod audio — discriminator or AFSK tones
+- Weatherfax (HF fax) decoder on USB/LSB audio — IOC 576/288, LPM 120/60, APT sync, progressive chart + PNG export; USCG station schedule/map with auto-tune and HF reachability
 - FT8 decoder on USB/LSB demod audio (UTC 15 s periods, powered by `@e04/ft8ts`)
+- P25 Phase 1 trunk + voice — C4FM from IQ, control-channel follow (single dongle), clear IMBE playback; encrypted calls muted
 - ML signal identification — scans the tuned window and classifies each signal's modulation
 
 Powered by [`@jtarrio/webrtlsdr`](https://github.com/jtarrio/webrtlsdr) and [`@jtarrio/signals`](https://github.com/jtarrio/signals).
+
+### P25 / IMBE patent notice
+
+P25 clear-voice synthesis uses a WebAssembly build of [mbelib](https://github.com/szechyjs/mbelib) (educational IMBE/AMBE primitives). Executable objects derived from that package may be covered by patents; check licensing before redistributing binaries. Metadata decode (NAC, talkgroups, grants) does not require the vocoder.
 
 ## Signal identification
 

@@ -70,8 +70,8 @@ export function MorsePanel() {
       <p className="mt-2 text-[0.65rem] leading-relaxed text-muted">
         Use CW (or USB with the pitch in the tone control). Demo mode has Morse at{" "}
         {(DEMO_MORSE_FREQUENCY_HZ / 1e6).toFixed(3)} MHz — tune there, select CW,
-        then Decode. CQ, Q-codes, prosigns, and callsigns are identified
-        automatically.
+        then Decode. CQ, Q-codes, and prosigns are identified; click a callsign
+        to look it up.
       </p>
     </fieldset>
   );

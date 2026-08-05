@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { CallsignButton } from "@/components/sdr/callsign/callsign-button";
 import {
   findMorseKeywords,
   keywordKindLabel,
@@ -32,15 +33,29 @@ function renderHighlighted(text: string): ReactNode[] {
     }
     const end = hit.index + hit.token.length;
     const slice = text.slice(hit.index, end);
-    nodes.push(
-      <mark
-        key={`${hit.index}-${hit.token}`}
-        className={`morse-kw-mark ${KIND_CLASS[hit.kind]}`}
-        title={`${keywordKindLabel(hit.kind)} · ${hit.meaning}`}
-      >
-        {slice}
-      </mark>,
-    );
+    const title = `${keywordKindLabel(hit.kind)} · ${hit.meaning}`;
+    if (hit.kind === "callsign") {
+      nodes.push(
+        <CallsignButton
+          key={`${hit.index}-${hit.token}`}
+          callsign={hit.token}
+          className={`morse-kw-mark morse-kw-mark-btn ${KIND_CLASS[hit.kind]}`}
+          title={`${title} — click to look up`}
+        >
+          {slice}
+        </CallsignButton>,
+      );
+    } else {
+      nodes.push(
+        <mark
+          key={`${hit.index}-${hit.token}`}
+          className={`morse-kw-mark ${KIND_CLASS[hit.kind]}`}
+          title={title}
+        >
+          {slice}
+        </mark>,
+      );
+    }
     cursor = end;
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));
@@ -66,7 +81,7 @@ export function MorseOutput({ text, enabled }: MorseOutputProps) {
       {text.length === 0 ? (
         <p className="font-sans text-sm text-muted">
           {enabled
-            ? "Characters appear here as Morse elements decode. Keywords, Q-codes, and callsigns are highlighted."
+            ? "Characters appear here as Morse elements decode. Keywords and Q-codes are highlighted; click a callsign to look it up."
             : "Enable Decode to read Morse / CW from the current demod."}
         </p>
       ) : (

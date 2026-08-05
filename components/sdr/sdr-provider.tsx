@@ -17,8 +17,18 @@ import type { Ft8State } from "@/lib/sdr/ft8/types";
 import { DEFAULT_FT8_CONFIG } from "@/lib/sdr/ft8/types";
 import type { MorseState } from "@/lib/sdr/morse/types";
 import { DEFAULT_MORSE_CONFIG } from "@/lib/sdr/morse/types";
+import type { P25State } from "@/lib/sdr/p25/types";
+import {
+  DEFAULT_P25_CONFIG,
+  DEFAULT_P25_SYSTEM,
+} from "@/lib/sdr/p25/types";
 import type { SignalIdState } from "@/lib/sdr/signal-id/types";
 import type { TranscriptionState } from "@/lib/sdr/transcription-engine";
+import type { WefaxState } from "@/lib/sdr/wefax/types";
+import {
+  DEFAULT_WEFAX_CONFIG,
+  wefaxLineWidth,
+} from "@/lib/sdr/wefax/types";
 import { DEFAULT_SAMPLE_RATE, type SdrState } from "@/lib/sdr/types";
 
 const ControllerContext = createContext<RadioController | null>(null);
@@ -180,6 +190,58 @@ export function useMorseState(): MorseState {
       }),
     () => controller.getMorseState(),
     () => SERVER_MORSE,
+  );
+}
+
+const SERVER_WEFAX: WefaxState = {
+  enabled: false,
+  status: "idle",
+  config: DEFAULT_WEFAX_CONFIG,
+  width: wefaxLineWidth(DEFAULT_WEFAX_CONFIG.ioc),
+  lines: 0,
+  frameId: 0,
+  toneHz: 1900,
+  lock: 0,
+  error: null,
+};
+
+export function useWefaxState(): WefaxState {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeWefax(() => {
+        onStoreChange();
+      }),
+    () => controller.getWefaxState(),
+    () => SERVER_WEFAX,
+  );
+}
+
+const SERVER_P25: P25State = {
+  enabled: false,
+  status: "idle",
+  config: DEFAULT_P25_CONFIG,
+  system: DEFAULT_P25_SYSTEM,
+  lock: 0,
+  decodeRate: 0,
+  controlChannelHz: null,
+  voiceFrequencyHz: null,
+  activeCalls: [],
+  recentCalls: [],
+  messages: [],
+  error: null,
+  imbeReady: false,
+};
+
+export function useP25State(): P25State {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeP25(() => {
+        onStoreChange();
+      }),
+    () => controller.getP25State(),
+    () => SERVER_P25,
   );
 }
 

@@ -45,6 +45,22 @@ import type {
   MorsePresetId,
   MorseState,
 } from "./morse/types";
+import { createDemoP25Generator } from "./p25/demo-signal";
+import { P25DecoderEngine } from "./p25/engine";
+import { P25IqReceiver } from "./p25/iq-receiver";
+import type {
+  P25Config,
+  P25Listener,
+  P25State,
+} from "./p25/types";
+import { createDemoWefaxGenerator } from "./wefax/demo-signal";
+import { WefaxDecoderEngine } from "./wefax/engine";
+import type {
+  WefaxConfig,
+  WefaxListener,
+  WefaxPresetId,
+  WefaxState,
+} from "./wefax/types";
 import {
   SignalIdEngine,
   type SignalIdSensitivity,
@@ -92,6 +108,8 @@ function createDemoGenerator() {
     createDemoFskGenerator(0.09),
     createDemoFt8Generator(0.05),
     createDemoMorseGenerator(0.06),
+    createDemoP25Generator(0.08),
+    createDemoWefaxGenerator(0.05),
     noise(0.03),
   );
 }
@@ -123,6 +141,9 @@ export class RadioController {
   private readonly fsk = new FskDecoderEngine();
   private readonly ft8 = new Ft8DecoderEngine();
   private readonly morse = new MorseDecoderEngine();
+  private readonly wefax = new WefaxDecoderEngine();
+  private readonly p25 = new P25DecoderEngine();
+  private readonly p25Iq = new P25IqReceiver();
   private readonly signalId = new SignalIdEngine();
   private readonly squelchGate = new SquelchGate();
   private spectrumBuffer = new Float32Array(FFT_SIZE);
@@ -130,12 +151,14 @@ export class RadioController {
   private stateListeners = new Set<StateListener>();
   private spectrumListeners = new Set<SpectrumListener>();
   private lastSquelchEvalMs = 0;
+  private digitalMute = false;
   private onSampleClick = () => this.emitSpectrum();
   private onTapAudio = (mono: Float32Array, sampleRate: number) => {
     this.transcription.pushAudio(mono, sampleRate);
     this.fsk.pushAudio(mono, sampleRate);
     this.ft8.pushAudio(mono, sampleRate);
     this.morse.pushAudio(mono, sampleRate);
+    this.wefax.pushAudio(mono, sampleRate);
   };
 
   private state: SdrState = {
@@ -272,6 +295,75 @@ export class RadioController {
     this.morse.clear();
   }
 
+  getWefaxState(): WefaxState {
+    return this.wefax.getState();
+  }
+
+  subscribeWefax(listener: WefaxListener): () => void {
+    return this.wefax.subscribe(listener);
+  }
+
+  getWefaxImage(): { pixels: Uint8Array; width: number; lines: number } {
+    return this.wefax.getImage();
+  }
+
+  setWefaxEnabled(enabled: boolean): void {
+    this.wefax.setEnabled(enabled);
+    this.syncTapping();
+  }
+
+  setWefaxPreset(preset: Exclude<WefaxPresetId, "custom">): void {
+    this.wefax.setPreset(preset);
+  }
+
+  patchWefaxConfig(partial: Partial<WefaxConfig>): void {
+    this.wefax.patchConfig(partial);
+  }
+
+  setWefaxInverted(inverted: boolean): void {
+    this.wefax.setInverted(inverted);
+  }
+
+  forceWefaxStart(): void {
+    this.wefax.forceStart();
+  }
+
+  clearWefaxImage(): void {
+    this.wefax.clear();
+  }
+
+  getP25State(): P25State {
+    return this.p25.getState();
+  }
+
+  subscribeP25(listener: P25Listener): () => void {
+    return this.p25.subscribe(listener);
+  }
+
+  async setP25Enabled(enabled: boolean): Promise<void> {
+    this.bindP25Hooks();
+    this.p25Iq.setEnabled(enabled);
+    await this.p25.setEnabled(enabled);
+    if (enabled) {
+      this.setScheme("NBFM");
+      this.p25Iq.setOffsetHz(this.state.offsetHz);
+    } else {
+      this.setDigitalMute(false);
+    }
+  }
+
+  patchP25Config(partial: Partial<P25Config>): void {
+    this.p25.patchConfig(partial);
+  }
+
+  clearP25Messages(): void {
+    this.p25.clearMessages();
+  }
+
+  clearP25Calls(): void {
+    this.p25.clearCalls();
+  }
+
   getSignalIdState(): SignalIdState {
     return this.signalId.getState();
   }
@@ -380,6 +472,8 @@ export class RadioController {
           status: "playing",
         });
         this.demodulator?.setFrequencyOffset(this.state.offsetHz);
+        this.p25Iq.setSampleRate(actual);
+        this.p25Iq.setOffsetHz(this.state.offsetHz);
       }
     } catch (err) {
       this.patch({
@@ -394,6 +488,7 @@ export class RadioController {
     const offsetHz = clamp(Math.round(hz), -half, half);
     this.patch({ offsetHz });
     this.demodulator?.setFrequencyOffset(offsetHz);
+    this.p25Iq.setOffsetHz(offsetHz);
   }
 
   /**
@@ -431,7 +526,9 @@ export class RadioController {
   setVolume(volume: number): void {
     const v = clamp(volume, 0, 1);
     this.patch({ volume: v });
-    this.demodulator?.setVolume(v);
+    if (!this.digitalMute) {
+      this.demodulator?.setVolume(v);
+    }
   }
 
   async setAutoGain(auto: boolean): Promise<void> {
@@ -530,7 +627,16 @@ export class RadioController {
     const demodulator = new Demodulator({ player });
     const spectrum = new Spectrum(FFT_SIZE);
     const sampleCounter = new SampleCounter(20);
-    const receiver = CompositeReceiver.of(spectrum, demodulator, sampleCounter);
+    this.p25Iq.setSampleRate(this.state.sampleRate);
+    this.p25Iq.setOffsetHz(this.state.offsetHz);
+    this.p25Iq.setSink((dibits, lock) => this.p25.pushDibits(dibits, lock));
+    this.bindP25Hooks();
+    const receiver = CompositeReceiver.of(
+      spectrum,
+      demodulator,
+      sampleCounter,
+      this.p25Iq,
+    );
     const radio = new Radio(provider, receiver);
 
     this.player = player;
@@ -584,12 +690,14 @@ export class RadioController {
       await radio.start();
       const actualRate = radio.getSampleRate();
       const half = actualRate / 2;
+      this.p25Iq.setSampleRate(actualRate);
       this.patch({
         sampleRate: actualRate,
         offsetHz: clamp(this.state.offsetHz, -half, half),
         status: "playing",
       });
       demodulator.setFrequencyOffset(this.state.offsetHz);
+      this.p25Iq.setOffsetHz(this.state.offsetHz);
     } catch (err) {
       this.teardown();
       this.patch({
@@ -679,6 +787,9 @@ export class RadioController {
     this.signalId.reset();
     this.squelchGate.reset();
     this.lastSquelchEvalMs = 0;
+    this.p25Iq.setEnabled(false);
+    this.p25Iq.reset();
+    this.setDigitalMute(false);
     this.sampleCounter?.removeEventListener("sample-click", this.onSampleClick);
     this.untap?.();
     this.untap = null;
@@ -691,12 +802,30 @@ export class RadioController {
     this.sampleCounter = null;
   }
 
+  private bindP25Hooks(): void {
+    this.p25.setRadioHooks({
+      setFrequency: (hz) => this.setFrequency(hz),
+      setOffset: (hz) => this.setOffset(hz),
+      setSchemeNbfm: () => this.setScheme("NBFM"),
+      setDigitalMute: (muted) => this.setDigitalMute(muted),
+      getFrequency: () => this.state.frequencyHz,
+      getOffset: () => this.state.offsetHz,
+    });
+  }
+
+  private setDigitalMute(muted: boolean): void {
+    this.digitalMute = muted;
+    if (!this.demodulator) return;
+    this.demodulator.setVolume(muted ? 0 : this.state.volume);
+  }
+
   private wantAudioTap(): boolean {
     return (
       this.transcription.getState().enabled ||
       this.fsk.getState().enabled ||
       this.ft8.getState().enabled ||
-      this.morse.getState().enabled
+      this.morse.getState().enabled ||
+      this.wefax.getState().enabled
     );
   }
 
