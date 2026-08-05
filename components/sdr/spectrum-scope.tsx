@@ -18,7 +18,8 @@ import {
   type SpectrumViewport,
   viewSpanHz,
 } from "@/lib/sdr/spectrum-viewport";
-import { dbRangeFor, type DbRangeId } from "@/lib/sdr/display-settings";
+import { dbRangeFor, type DbRangeId, type NoiseFilterId } from "@/lib/sdr/display-settings";
+import { SpectrumNoiseFilter } from "@/lib/sdr/spectrum-noise-filter";
 
 type SpectrumScopeProps = {
   sampleRate: number;
@@ -31,6 +32,7 @@ type SpectrumScopeProps = {
   onCenterOnOffset: (offsetHz: number) => void;
   onPanLo: (deltaHz: number) => void;
   dbRange: DbRangeId;
+  noiseFilter?: NoiseFilterId;
   /** Identified signals to annotate over the trace. */
   markers?: SignalMarker[];
 };
@@ -46,6 +48,7 @@ export function SpectrumScope({
   onCenterOnOffset,
   onPanLo,
   dbRange,
+  noiseFilter = "off",
   markers,
 }: SpectrumScopeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -55,6 +58,9 @@ export function SpectrumScope({
   const dirtyRef = useRef(true);
   const markersRef = useRef<SignalMarker[]>([]);
   markersRef.current = markers ?? [];
+  const noiseFilterRef = useRef(new SpectrumNoiseFilter());
+  const noiseStrengthRef = useRef(noiseFilter);
+  noiseStrengthRef.current = noiseFilter;
 
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
@@ -72,7 +78,12 @@ export function SpectrumScope({
   // Props that affect the trace/overlays — mark dirty without reallocating draw.
   useEffect(() => {
     dirtyRef.current = true;
-  }, [bandwidthHz, frequencyHz, offsetHz, sampleRate, viewport, dbRange, markers]);
+  }, [bandwidthHz, frequencyHz, offsetHz, sampleRate, viewport, dbRange, markers, noiseFilter]);
+
+  useEffect(() => {
+    noiseFilterRef.current.reset();
+    dirtyRef.current = true;
+  }, [noiseFilter]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -226,10 +237,14 @@ export function SpectrumScope({
 
   useSpectrumStream(
     useCallback((spectrum, centerHz) => {
-      if (!latestRef.current || latestRef.current.length !== spectrum.length) {
-        latestRef.current = new Float32Array(spectrum.length);
+      const filtered = noiseFilterRef.current.apply(
+        spectrum,
+        noiseStrengthRef.current,
+      );
+      if (!latestRef.current || latestRef.current.length !== filtered.length) {
+        latestRef.current = new Float32Array(filtered.length);
       }
-      latestRef.current.set(spectrum);
+      latestRef.current.set(filtered);
       centerRef.current = centerHz;
       dirtyRef.current = true;
     }, []),

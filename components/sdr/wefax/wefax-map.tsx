@@ -21,6 +21,68 @@ function project(lat: number, lon: number): { x: number; y: number } {
   return { x, y };
 }
 
+/** Rough coastline rings (lon, lat)… closed. */
+const LAND: readonly (readonly (readonly [number, number])[])[] = [
+  // Alaska + mainland West Coast through Baja-ish
+  [
+    [-166, 54],
+    [-158, 57],
+    [-152, 58],
+    [-140, 60],
+    [-130, 55],
+    [-124, 48],
+    [-124, 40],
+    [-117, 32],
+    [-110, 24],
+    [-105, 22],
+    [-97, 26],
+    [-97, 28],
+    [-90, 29],
+    [-84, 30],
+    [-81, 25],
+    [-80, 32],
+    [-76, 35],
+    [-75, 40],
+    [-70, 42],
+    [-67, 45],
+    [-68, 48],
+    [-60, 47],
+    [-55, 50],
+    [-60, 55],
+    [-70, 58],
+    [-80, 55],
+    [-90, 50],
+    [-95, 50],
+    [-100, 55],
+    [-110, 60],
+    [-120, 62],
+    [-130, 65],
+    [-140, 68],
+    [-150, 70],
+    [-160, 68],
+    [-168, 60],
+    [-166, 54],
+  ],
+  // Hawaii
+  [
+    [-160.2, 22.2],
+    [-157.5, 21.8],
+    [-155.5, 19.5],
+    [-156.2, 18.9],
+    [-158, 21.2],
+    [-160.2, 22.2],
+  ],
+];
+
+function landPath(ring: readonly (readonly [number, number])[]): string {
+  return ring
+    .map(([lon, lat], i) => {
+      const { x, y } = project(lat, lon);
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
 function tierClass(tier: ReachabilityTier): string {
   return `wefax-reach wefax-reach-${tier}`;
 }
@@ -78,15 +140,9 @@ export function WefaxMap({
         aria-label="Weatherfax transmitter map"
       >
         <rect width={W} height={H} className="wefax-map-ocean" />
-        <path
-          className="wefax-map-land"
-          d="M78 28 L95 22 L118 28 L130 42 L125 58 L108 72 L92 78 L70 70 L62 52 Z
-             M118 78 L145 70 L168 78 L175 98 L160 118 L130 122 L112 108 L108 90 Z
-             M168 40 L195 32 L220 40 L235 58 L228 78 L200 88 L175 72 L168 55 Z
-             M48 8 L72 4 L95 12 L88 28 L60 32 L45 20 Z
-             M210 95 L248 88 L275 102 L268 128 L240 138 L215 125 L208 108 Z
-             M255 45 L290 38 L310 55 L300 78 L270 85 L252 68 Z"
-        />
+        {LAND.map((ring, i) => (
+          <path key={i} className="wefax-map-land" d={landPath(ring)} />
+        ))}
         {[30, 40, 50, 60].map((lat) => {
           const { y } = project(lat, MAP_LON0);
           return (
@@ -149,7 +205,6 @@ export function WefaxMap({
                 r={selected ? 6.5 : 5}
                 className={`wefax-map-dot ${tierClass(tier)} ${selected ? "wefax-map-dot-selected" : ""}`}
               />
-              {/* Larger invisible hit target */}
               <circle cx={x} cy={y} r={14} fill="transparent" />
               <text
                 x={x + 8}

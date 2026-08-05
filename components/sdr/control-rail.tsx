@@ -29,6 +29,7 @@ import {
   useTranscriptionState,
   useWefaxState,
 } from "@/components/sdr/sdr-provider";
+import { ShortwaveExplorer } from "@/components/sdr/shortwave/shortwave-explorer";
 import { SignalIdPanel } from "@/components/sdr/signal-id/signal-id-panel";
 import { TranscriptPanel } from "@/components/sdr/transcript-panel";
 import { WefaxPanel } from "@/components/sdr/wefax/wefax-panel";
@@ -133,6 +134,7 @@ export function ControlRail({
               <SampleRateControl />
               <AudioGainControl />
               <GmrsChannelPresets />
+              <ShortwaveExplorer />
               <HelpCard supported={state.webUsbSupported} />
             </div>
           )}

@@ -17,40 +17,45 @@ type Props = {
 };
 
 export function WefaxSchedule({ station, nowMin, onTuneNext }: Props) {
-  const world = nextWefaxWorldwide(nowMin);
   const local = nextProductForStation(station, nowMin);
+  const world = nextWefaxWorldwide(nowMin);
   const upcoming = upcomingProducts(station, 150, nowMin).slice(0, 8);
+  const elsewhere =
+    world &&
+    world.station.id !== station.id &&
+    (world.transmitting ||
+      !local?.transmitting ||
+      world.minutesUntil < (local?.minutesUntil ?? 9999))
+      ? world
+      : null;
 
   return (
     <div className="wefax-schedule">
       <p className="mb-1.5 text-[0.65rem] font-medium text-muted">Schedule</p>
 
-      {world ? (
+      {local ? (
         <div className="wefax-next-banner">
           <div className="min-w-0 flex-1">
             <p className="text-[0.65rem] uppercase tracking-wide text-muted">
-              {world.transmitting ? "On air" : "Next fax"}
+              {local.transmitting ? "On air here" : "Next here"}
             </p>
             <p className="truncate font-mono text-sm text-ink">
-              {world.station.callsign} · {formatUtcHmm(world.product.startMin)}
+              {station.callsign} · {formatUtcHmm(local.product.startMin)}
             </p>
             <p className="truncate text-[0.7rem] text-muted">
-              {world.product.title}
-              {world.station.id !== station.id
-                ? ` · ${world.station.name}`
-                : null}
+              {local.product.title}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <span className="font-mono text-sm text-accent">
-              {world.transmitting
+              {local.transmitting
                 ? "LIVE"
-                : formatCountdown(world.minutesUntil)}
+                : formatCountdown(local.minutesUntil)}
             </span>
             <button
               type="button"
               className="btn-secondary !min-h-7 !px-2 !text-[0.65rem]"
-              onClick={() => onTuneNext(world)}
+              onClick={() => onTuneNext(local)}
             >
               Tune
             </button>
@@ -58,13 +63,20 @@ export function WefaxSchedule({ station, nowMin, onTuneNext }: Props) {
         </div>
       ) : null}
 
-      {local &&
-      (world?.station.id !== local.station.id ||
-        world.product.startMin !== local.product.startMin) ? (
+      {elsewhere ? (
         <p className="mt-1.5 text-[0.65rem] text-muted">
-          Next here · {formatUtcHmm(local.product.startMin)} ·{" "}
-          {local.transmitting ? "LIVE" : formatCountdown(local.minutesUntil)} ·{" "}
-          {local.product.title}
+          {elsewhere.transmitting ? "Also live" : "Sooner"} ·{" "}
+          <button
+            type="button"
+            className="text-accent underline-offset-2 hover:underline"
+            onClick={() => onTuneNext(elsewhere)}
+          >
+            {elsewhere.station.callsign} {formatUtcHmm(elsewhere.product.startMin)}
+          </button>
+          {" · "}
+          {elsewhere.transmitting
+            ? "LIVE"
+            : formatCountdown(elsewhere.minutesUntil)}
         </p>
       ) : null}
 
@@ -75,7 +87,7 @@ export function WefaxSchedule({ station, nowMin, onTuneNext }: Props) {
               type="button"
               className={`wefax-schedule-row ${item.transmitting ? "wefax-schedule-row-live" : ""}`}
               onClick={() => onTuneNext(item)}
-              title="Tune USB and decode"
+              title="Tune USB, start Demo if needed, and decode"
             >
               <span className="font-mono text-[0.7rem] text-accent">
                 {formatUtcHmm(item.product.startMin)}

@@ -26,29 +26,73 @@ const IMAGE_SEC = IMAGE_LINES * LINE_SEC;
 const CYCLE_SEC = START_SEC + PHASE_SEC + IMAGE_SEC + STOP_SEC + GAP_SEC;
 
 /**
- * USB-style HF weatherfax on the demo dial — APT start, phasing, chart, stop.
- * Tune USB to the demo frequency; fax tones sit at dial + 1.5–2.3 kHz.
+ * USB-style HF weatherfax — APT start, phasing, chart, stop.
+ * Fax tones sit at `carrierHz` + 1.5–2.3 kHz (USB dial = carrier).
  */
-export function createDemoWefaxGenerator(amplitude = 0.05): SampleGenerator {
+export function createDemoWefaxGenerator(
+  amplitude = 0.05,
+  carrierHz = DEMO_WEFAX_FREQUENCY_HZ,
+): SampleGenerator {
   return (sample, rate, _center, I, Q) => {
-    for (let i = 0; i < I.length; i++) {
-      const t = ((sample + i) / rate) % CYCLE_SEC;
-      const audioHz = audioAt(t);
-      if (audioHz <= 0) {
-        I[i] = 0;
-        Q[i] = 0;
-        continue;
-      }
-      const rfHz = DEMO_WEFAX_FREQUENCY_HZ + audioHz;
-      const phase = (2 * Math.PI * rfHz * (sample + i)) / rate;
-      I[i] = amplitude * Math.cos(phase);
-      Q[i] = amplitude * Math.sin(phase);
-    }
+    fillWefax(sample, rate, I, Q, amplitude, carrierHz);
   };
 }
 
+/**
+ * One fax at a time: transmits on the published carrier nearest the LO so
+ * nearby NOAA freqs in a 1 MHz span don't collide in Demo.
+ */
+export function createDemoWefaxBank(
+  carriersHz: readonly number[],
+  amplitude = 0.05,
+): SampleGenerator {
+  const carriers = carriersHz.length > 0 ? carriersHz : [DEMO_WEFAX_FREQUENCY_HZ];
+  return (sample, rate, center, I, Q) => {
+    let best = carriers[0]!;
+    let bestDist = Math.abs(best - center);
+    for (let i = 1; i < carriers.length; i++) {
+      const c = carriers[i]!;
+      const d = Math.abs(c - center);
+      if (d < bestDist) {
+        best = c;
+        bestDist = d;
+      }
+    }
+    if (bestDist > rate * 0.48) {
+      I.fill(0);
+      Q.fill(0);
+      return;
+    }
+    fillWefax(sample, rate, I, Q, amplitude, best);
+  };
+}
+
+function fillWefax(
+  sample: number,
+  rate: number,
+  I: Float32Array,
+  Q: Float32Array,
+  amplitude: number,
+  carrierHz: number,
+): void {
+  for (let i = 0; i < I.length; i++) {
+    const t = ((sample + i) / rate) % CYCLE_SEC;
+    const audioHz = audioAt(t);
+    if (audioHz <= 0) {
+      I[i] = 0;
+      Q[i] = 0;
+      continue;
+    }
+    const rfHz = carrierHz + audioHz;
+    const phase = (2 * Math.PI * rfHz * (sample + i)) / rate;
+    I[i] = amplitude * Math.cos(phase);
+    Q[i] = amplitude * Math.sin(phase);
+  }
+}
+
 function audioAt(t: number): number {
-  if (t < START_SEC) return WEFAX_APT_START_IOC576_HZ;
+  // ITU APT: alternate black/white at 300 Hz (start) / 450 Hz (stop).
+  if (t < START_SEC) return aptAlternate(t, WEFAX_APT_START_IOC576_HZ);
 
   const afterStart = t - START_SEC;
   if (afterStart < PHASE_SEC) {
@@ -64,9 +108,17 @@ function audioAt(t: number): number {
   }
 
   const afterImage = afterPhase - IMAGE_SEC;
-  if (afterImage < STOP_SEC) return WEFAX_APT_STOP_HZ;
+  if (afterImage < STOP_SEC) {
+    return aptAlternate(afterImage, WEFAX_APT_STOP_HZ);
+  }
 
   return 0;
+}
+
+/** Black↔white FSK square wave at the APT modulation rate. */
+function aptAlternate(t: number, rateHz: number): number {
+  const phase = (t * rateHz) % 1;
+  return phase < 0.5 ? BLACK_HZ : WHITE_HZ;
 }
 
 /** Black line with a short white sync pulse at the leading edge. */

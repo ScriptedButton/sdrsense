@@ -111,9 +111,9 @@ export function WefaxPanel() {
       <WefaxImage />
 
       <p className="mt-2 text-[0.65rem] leading-relaxed text-muted">
-        Use USB with ~2.5–3 kHz bandwidth. Black/white tones are typically 1500 /
-        2300 Hz. Station chips dial assigned − 1.9 kHz. Demo chart at{" "}
-        {(DEMO_WEFAX_FREQUENCY_HZ / 1e6).toFixed(3)} MHz.
+        Tune starts Demo (or uses your stick), sets USB ~2.9 kHz, dials assigned −
+        1.9 kHz, and enables decode. Black/white tones 1500 / 2300 Hz. Band preset
+        Fax {(DEMO_WEFAX_FREQUENCY_HZ / 1e6).toFixed(3)} MHz also has a demo chart.
       </p>
     </fieldset>
   );

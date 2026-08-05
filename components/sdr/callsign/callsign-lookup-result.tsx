@@ -50,7 +50,7 @@ export function CallsignLookupResult({
   if (!record) {
     return (
       <p className="mt-3 text-sm text-muted">
-        Enter an amateur or GMRS callsign, or click one in Morse decode.
+        Enter an amateur or GMRS callsign, or click one in Morse / FT8 decode.
       </p>
     );
   }

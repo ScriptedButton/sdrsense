@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { Ft8MessageText } from "@/components/sdr/ft8/ft8-message-text";
 import type { Ft8Message } from "@/lib/sdr/ft8/types";
 
 type Ft8MessageListProps = {
@@ -33,7 +34,7 @@ export function Ft8MessageList({ messages, enabled }: Ft8MessageListProps) {
       {messages.length === 0 ? (
         <p className="text-sm text-muted">
           {enabled
-            ? "Decodes appear at the end of each 15 s UTC period."
+            ? "Decodes appear at the end of each 15 s UTC period. Keywords and grids are highlighted; click a callsign to look it up."
             : "Enable Decode to read FT8 from USB demod audio."}
         </p>
       ) : (
@@ -56,7 +57,7 @@ export function Ft8MessageList({ messages, enabled }: Ft8MessageListProps) {
               <span className="mr-2 tabular-nums text-muted">
                 {Math.round(m.freq)}
               </span>
-              <span>{m.msg}</span>
+              <Ft8MessageText msg={m.msg} />
             </li>
           ))}
         </ul>

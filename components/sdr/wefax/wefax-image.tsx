@@ -51,7 +51,7 @@ export function WefaxImage() {
         <p className="p-3 font-sans text-sm text-muted">
           {wefax.enabled
             ? wefax.config.sync === "auto"
-              ? "Waiting for APT start (300 / 675 Hz)… or Force start mid-chart."
+              ? "Waiting for APT start (300 / 675 Hz B/W)… or Force start mid-chart."
               : "Imaging from demod audio — chart lines appear here."
             : "Enable Decode to paint HF weatherfax from the current USB/LSB demod."}
         </p>

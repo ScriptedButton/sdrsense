@@ -2,6 +2,7 @@
 
 import { ConnectBar } from "@/components/sdr/connect-bar";
 import { FrequencyDigitDisplay } from "@/components/sdr/frequency-digit-display";
+import { ShortwaveStationInfo } from "@/components/sdr/shortwave/shortwave-station-info";
 import { formatFrequencyWith } from "@/lib/sdr/format";
 import type { FreqFormatId, FreqTargetId } from "@/lib/sdr/display-settings";
 
@@ -42,6 +43,7 @@ export function AppHeader({
             · {freqTarget === "tune" ? "listen" : "LO center"}
           </span>
         </p>
+        <ShortwaveStationInfo />
       </div>
 
       <div className="app-header-actions">

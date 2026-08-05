@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/sdr/app-header";
 import { ControlRail } from "@/components/sdr/control-rail";
 import { DisplayModeToggle } from "@/components/sdr/display-mode-toggle";
+import { NoiseFilterControl } from "@/components/sdr/noise-filter-control";
 import { PrimaryToolbar } from "@/components/sdr/primary-toolbar";
 import {
   useRadioController,
@@ -23,6 +24,7 @@ import {
   loadDisplaySettings,
   patchDisplaySettings,
   type DisplaySettings,
+  type NoiseFilterId,
 } from "@/lib/sdr/display-settings";
 import { classInfo } from "@/lib/sdr/signal-id/labels";
 import type { SignalMarker } from "@/lib/sdr/signal-id/scope-overlay";
@@ -162,6 +164,10 @@ export function SdrApp() {
               sampleRate={state.sampleRate}
               offsetHz={state.offsetHz}
               bandwidthHz={state.bandwidthHz}
+              noiseFilter={settings.noiseFilter}
+              onNoiseFilterChange={(noiseFilter) =>
+                updateSettings({ noiseFilter })
+              }
               onTuneOffset={onTuneOffset}
             />
           )}
@@ -248,6 +254,7 @@ function ScopeLayout({
             onCenterOnOffset={onCenterOnOffset}
             onPanLo={onPanLo}
             dbRange={settings.dbRange}
+            noiseFilter={settings.noiseFilter}
             markers={markers}
           />
         ) : (
@@ -267,6 +274,7 @@ function ScopeLayout({
             speed={settings.waterfallSpeed}
             direction={settings.waterfallDirection}
             dbRange={settings.dbRange}
+            noiseFilter={settings.noiseFilter}
             onPaletteChange={(waterfallPalette) =>
               onSettingsChange({ waterfallPalette })
             }
@@ -277,6 +285,9 @@ function ScopeLayout({
               onSettingsChange({ waterfallDirection })
             }
             onDbRangeChange={(dbRange) => onSettingsChange({ dbRange })}
+            onNoiseFilterChange={(noiseFilter) =>
+              onSettingsChange({ noiseFilter })
+            }
           />
         )}
         {!live && <p className="text-xs text-muted">Newest at top</p>}
@@ -298,6 +309,7 @@ function ScopeLayout({
             speed={settings.waterfallSpeed}
             direction={settings.waterfallDirection}
             dbRange={settings.dbRange}
+            noiseFilter={settings.noiseFilter}
           />
         ) : (
           <EmptyDisplay
@@ -315,6 +327,8 @@ type SpectrometerLayoutProps = {
   sampleRate: number;
   offsetHz: number;
   bandwidthHz: number;
+  noiseFilter: NoiseFilterId;
+  onNoiseFilterChange: (id: NoiseFilterId) => void;
   onTuneOffset: (offsetHz: number) => void;
 };
 
@@ -323,6 +337,8 @@ function SpectrometerLayout({
   sampleRate,
   offsetHz,
   bandwidthHz,
+  noiseFilter,
+  onNoiseFilterChange,
   onTuneOffset,
 }: SpectrometerLayoutProps) {
   return (
@@ -334,13 +350,20 @@ function SpectrometerLayout({
               sampleRate={sampleRate}
               offsetHz={offsetHz}
               bandwidthHz={bandwidthHz}
+              noiseFilter={noiseFilter}
               onTuneOffset={onTuneOffset}
             />
           </div>
-          <p className="border-t border-line px-4 py-1.5 text-xs text-muted">
-            Drag to orbit · scroll to zoom · click to tune · X frequency · Z time · Y
-            power
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-1.5">
+            <p className="text-xs text-muted">
+              Drag to orbit · scroll to zoom · click to tune · X frequency · Z
+              time · Y power
+            </p>
+            <NoiseFilterControl
+              value={noiseFilter}
+              onChange={onNoiseFilterChange}
+            />
+          </div>
         </>
       ) : (
         <EmptyDisplay

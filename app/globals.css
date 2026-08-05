@@ -548,6 +548,54 @@ body {
   font-size: 0.7rem;
 }
 
+.app-header-sw {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  max-width: min(28rem, 100%);
+  margin-top: 0.15rem;
+  text-align: center;
+}
+
+.app-header-sw-primary,
+.app-header-sw-meta {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-sw-primary {
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.app-header-sw-name {
+  font-weight: 550;
+}
+
+.app-header-sw-live {
+  display: inline-block;
+  margin-right: 0.35rem;
+  color: var(--accent);
+  font-size: 0.55rem;
+  vertical-align: 0.05em;
+}
+
+.app-header-sw-eta-live {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.app-header-sw-meta {
+  font-size: 0.62rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
 .app-header-actions {
   justify-self: end;
 }
@@ -963,7 +1011,8 @@ body {
   background: var(--canvas);
 }
 
-.morse-kw-chips {
+.morse-kw-chips,
+.ft8-kw-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.375rem;
@@ -972,7 +1021,8 @@ body {
   list-style: none;
 }
 
-.morse-kw-chip {
+.morse-kw-chip,
+.ft8-kw-chip {
   display: inline-flex;
   align-items: baseline;
   gap: 0.35rem;
@@ -986,13 +1036,15 @@ body {
   line-height: 1.3;
 }
 
-.morse-kw-chip-token {
+.morse-kw-chip-token,
+.ft8-kw-chip-token {
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--accent);
 }
 
-.morse-kw-chip-meaning {
+.morse-kw-chip-meaning,
+.ft8-kw-chip-meaning {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1001,75 +1053,92 @@ body {
   font-size: 0.6rem;
 }
 
-.morse-kw-procedure .morse-kw-chip-token {
+.morse-kw-procedure .morse-kw-chip-token,
+.ft8-kw-procedure .ft8-kw-chip-token {
   color: var(--accent);
 }
 
-.morse-kw-qcode .morse-kw-chip-token {
+.morse-kw-qcode .morse-kw-chip-token,
+.ft8-kw-report .ft8-kw-chip-token {
   color: var(--warn);
 }
 
-.morse-kw-prosign .morse-kw-chip-token {
+.morse-kw-prosign .morse-kw-chip-token,
+.ft8-kw-grid .ft8-kw-chip-token {
   color: var(--ink);
 }
 
-.morse-kw-callsign .morse-kw-chip-token {
+.morse-kw-callsign .morse-kw-chip-token,
+.ft8-kw-callsign .ft8-kw-chip-token {
   color: var(--primary);
 }
 
-.morse-kw-mark {
+.morse-kw-mark,
+.ft8-kw-mark {
   padding: 0 0.1em;
   border-radius: 0.15em;
   background: color-mix(in oklch, currentColor 16%, transparent);
   font-weight: 600;
 }
 
-.morse-kw-mark-procedure {
+.morse-kw-mark-procedure,
+.ft8-kw-mark-procedure {
   color: var(--accent);
 }
 
-.morse-kw-mark-qcode {
+.morse-kw-mark-qcode,
+.ft8-kw-mark-report {
   color: var(--warn);
 }
 
-.morse-kw-mark-prosign {
+.morse-kw-mark-prosign,
+.ft8-kw-mark-grid {
   color: var(--ink);
   background: color-mix(in oklch, var(--ink) 12%, transparent);
 }
 
-.morse-kw-mark-callsign {
+.morse-kw-mark-callsign,
+.ft8-kw-mark-callsign {
   color: var(--primary);
 }
 
 .morse-kw-chip-btn,
-.morse-kw-mark-btn {
+.morse-kw-mark-btn,
+.ft8-kw-chip-btn,
+.ft8-kw-mark-btn {
   cursor: pointer;
   font: inherit;
   text-align: inherit;
 }
 
-.morse-kw-chip-btn {
+.morse-kw-chip-btn,
+.ft8-kw-chip-btn {
   appearance: none;
 }
 
-.morse-kw-chip-btn:hover {
+.morse-kw-chip-btn:hover,
+.ft8-kw-chip-btn:hover {
   border-color: color-mix(in oklch, var(--primary) 55%, var(--line));
   background: color-mix(in oklch, var(--primary) 12%, var(--surface-2));
 }
 
 .morse-kw-chip-btn:focus-visible,
-.morse-kw-mark-btn:focus-visible {
+.morse-kw-mark-btn:focus-visible,
+.ft8-kw-chip-btn:focus-visible,
+.ft8-kw-mark-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.morse-kw-mark-btn {
+.morse-kw-mark-btn,
+.ft8-kw-mark-btn {
   appearance: none;
   border: 0;
   padding: 0 0.1em;
 }
 
-.morse-kw-mark-btn:hover {
+.morse-kw-mark-btn:hover,
+.ft8-kw-mark-btn:hover {
   background: color-mix(in oklch, currentColor 28%, transparent);
   text-decoration: underline;
   text-underline-offset: 0.15em;
@@ -1298,7 +1367,12 @@ body {
 }
 
 .wefax-freq-live {
+  margin-left: 0.15rem;
   color: var(--accent);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .wefax-next-banner {
@@ -1345,6 +1419,150 @@ body {
 
 .wefax-schedule-row-live {
   background: color-mix(in oklch, var(--accent) 10%, transparent);
+}
+
+/* —— Shortwave explorer —— */
+
+.sw-tuned {
+  margin-bottom: 0.75rem;
+}
+
+.sw-tuned .sw-list-wrap {
+  max-height: 9rem;
+}
+
+.sw-search,
+.sw-select {
+  display: block;
+  width: 100%;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.75rem;
+}
+
+.sw-search:focus-visible,
+.sw-select:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.sw-list-wrap {
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--canvas);
+}
+
+.sw-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sw-row {
+  display: grid;
+  grid-template-columns: 4.6rem 1fr auto;
+  gap: 0.4rem;
+  align-items: start;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-bottom: 1px solid color-mix(in oklch, var(--line) 70%, transparent);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out);
+}
+
+.sw-row:last-child {
+  border-bottom: none;
+}
+
+.sw-row:hover {
+  background: var(--surface-2);
+}
+
+.sw-row:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
+.sw-row-live {
+  background: color-mix(in oklch, var(--accent) 8%, transparent);
+}
+
+.sw-row-active {
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+
+.sw-row-freq {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  line-height: 1.25;
+  padding-top: 0.1rem;
+}
+
+.sw-row-unit {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+.sw-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.sw-row-name {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-row-meta {
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-row-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.sw-row-eta {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.sw-row-window {
+  font-size: 0.55rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-empty {
+  margin: 0;
+  padding: 0.75rem 0.5rem;
 }
 
 @keyframes wefax-pulse {

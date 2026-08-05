@@ -84,8 +84,8 @@ export function WefaxStationDetail({ station, score, nowMin }: Props) {
               />
               {formatWefaxKhz(freq.assignedHz)}
               {onAir ? (
-                <span className="wefax-freq-live" aria-label="on air">
-                  ·
+                <span className="wefax-freq-live" title="Transmitter scheduled">
+                  live
                 </span>
               ) : null}
             </button>

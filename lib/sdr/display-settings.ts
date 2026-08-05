@@ -4,7 +4,15 @@ import {
   makeGradientPalette,
   type Rgb,
 } from "./palette";
+import {
+  isNoiseFilterId,
+  NOISE_FILTER_OPTIONS,
+  type NoiseFilterId,
+} from "./spectrum-noise-filter";
 import { MAX_DB, MIN_DB } from "./types";
+
+export type { NoiseFilterId };
+export { NOISE_FILTER_OPTIONS };
 
 export type WaterfallPaletteId =
   | "cubehelix"
@@ -24,6 +32,7 @@ export type DisplaySettings = {
   waterfallSpeed: WaterfallSpeedId;
   waterfallDirection: WaterfallDirectionId;
   dbRange: DbRangeId;
+  noiseFilter: NoiseFilterId;
   freqTarget: FreqTargetId;
   freqFormat: FreqFormatId;
 };
@@ -33,6 +42,7 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   waterfallSpeed: "normal",
   waterfallDirection: "top",
   dbRange: "normal",
+  noiseFilter: "off",
   freqTarget: "tune",
   freqFormat: "auto",
 };
@@ -160,7 +170,11 @@ export function loadDisplaySettings(): DisplaySettings {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_DISPLAY_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<DisplaySettings>;
-    return { ...DEFAULT_DISPLAY_SETTINGS, ...parsed };
+    const next = { ...DEFAULT_DISPLAY_SETTINGS, ...parsed };
+    if (!isNoiseFilterId(next.noiseFilter)) {
+      next.noiseFilter = DEFAULT_DISPLAY_SETTINGS.noiseFilter;
+    }
+    return next;
   } catch {
     return DEFAULT_DISPLAY_SETTINGS;
   }

@@ -26,6 +26,7 @@ Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick
 - Frequency, offset, gain (AGC/manual), volume, bandwidth, squelch / auto-squelch
 - Band presets and demo mode with simulated signals
 - GMRS channel presets (1–22 + repeater inputs) and GMRS callsign lookup (FCC via Skywave)
+- Shortwave explorer — EiBi HF broadcast schedule; filter by on-air / band / language; one-tap AM tune
 - Live transcription of demodulated audio (Whisper tiny.en, in-browser)
 - Morse / CW decoder on demod audio — tone or envelope detection, fixed or auto WPM, with keyword / Q-code / callsign identification
 - Callsign lookup — amateur (HamDB + Callook) or GMRS (Skywave / FCC); click a callsign in Morse decode to open it
@@ -70,7 +71,7 @@ pnpm train:signal-id
 
 This synthesises labelled IQ for each class, transforms it with the same
 Blackman window and 2048-point FFT the live receiver uses, runs the result
-through the *same* detector and feature extractor the browser runs, trains an
+through the _same_ detector and feature extractor the browser runs, trains an
 MLP, and writes `lib/sdr/signal-id/model-weights.json`. It prints a confusion
 matrix and held-out accuracy. Useful flags: `--per-class`, `--frames`,
 `--epochs`, `--seed`.
@@ -86,6 +87,18 @@ pnpm fetch:signal-catalog
 
 That writes `lib/sdr/signal-id/catalog/signals.json`. The matcher prefers the
 fetched dump when it contains more entries than the curated seed.
+
+### Refreshing the shortwave schedule
+
+The Shortwave Explorer ships with an EiBi season snapshot (HF broadcast entries
+only). To pull the latest season file:
+
+```bash
+pnpm fetch:shortwave
+```
+
+That overwrites `lib/sdr/shortwave/schedule.json`. EiBi lists are free to copy
+and redistribute ([eibispace.de](http://www.eibispace.de/)).
 
 Sharing the feature code between training and inference is deliberate — it is
 what keeps synthetic training data faithful to live hardware. Every feature is

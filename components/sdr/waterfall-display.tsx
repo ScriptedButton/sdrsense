@@ -13,11 +13,13 @@ import {
   waterfallFrameStride,
   waterfallRowsPerUpdate,
   type DbRangeId,
+  type NoiseFilterId,
   type WaterfallDirectionId,
   type WaterfallPaletteId,
   type WaterfallSpeedId,
 } from "@/lib/sdr/display-settings";
 import { dbToPaletteIndex } from "@/lib/sdr/palette";
+import { SpectrumNoiseFilter } from "@/lib/sdr/spectrum-noise-filter";
 import {
   offsetHzToX,
   type SpectrumViewport,
@@ -38,6 +40,7 @@ type WaterfallDisplayProps = {
   speed: WaterfallSpeedId;
   direction: WaterfallDirectionId;
   dbRange: DbRangeId;
+  noiseFilter?: NoiseFilterId;
 };
 
 /**
@@ -59,6 +62,7 @@ export function WaterfallDisplay({
   speed,
   direction,
   dbRange,
+  noiseFilter = "off",
 }: WaterfallDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,6 +82,9 @@ export function WaterfallDisplay({
   offsetRef.current = offsetHz;
   const bandwidthRef = useRef(bandwidthHz);
   bandwidthRef.current = bandwidthHz;
+  const noiseFilterRef = useRef(new SpectrumNoiseFilter());
+  const noiseStrengthRef = useRef(noiseFilter);
+  noiseStrengthRef.current = noiseFilter;
 
   const paletteRef = useRef(getWaterfallPalette(paletteId));
   paletteRef.current = getWaterfallPalette(paletteId);
@@ -246,18 +253,22 @@ export function WaterfallDisplay({
   useSpectrumStream(
     useCallback(
       (spectrum) => {
+        const filtered = noiseFilterRef.current.apply(
+          spectrum,
+          noiseStrengthRef.current,
+        );
         // Peak-hold across skipped frames for slow mode.
-        if (!accumRef.current || accumRef.current.length !== spectrum.length) {
-          accumRef.current = new Float32Array(spectrum.length);
-          accumRef.current.set(spectrum);
+        if (!accumRef.current || accumRef.current.length !== filtered.length) {
+          accumRef.current = new Float32Array(filtered.length);
+          accumRef.current.set(filtered);
           hasAccumRef.current = true;
         } else if (!hasAccumRef.current) {
-          accumRef.current.set(spectrum);
+          accumRef.current.set(filtered);
           hasAccumRef.current = true;
         } else {
           const acc = accumRef.current;
-          for (let i = 0; i < spectrum.length; i++) {
-            const v = spectrum[i];
+          for (let i = 0; i < filtered.length; i++) {
+            const v = filtered[i];
             if (v > acc[i]) acc[i] = v;
           }
         }
@@ -292,7 +303,7 @@ export function WaterfallDisplay({
   }, []);
 
   // Clear waterfall history when the view window or look jumps.
-  const viewKey = `${viewport.zoom.toFixed(3)}:${Math.round(viewport.centerOffsetHz)}:${paletteId}:${direction}:${dbRange}`;
+  const viewKey = `${viewport.zoom.toFixed(3)}:${Math.round(viewport.centerOffsetHz)}:${paletteId}:${direction}:${dbRange}:${noiseFilter}`;
   const prevViewKey = useRef(viewKey);
   useEffect(() => {
     if (prevViewKey.current === viewKey) return;
@@ -305,6 +316,7 @@ export function WaterfallDisplay({
     accumRef.current = null;
     hasAccumRef.current = false;
     readyRef.current = false;
+    noiseFilterRef.current.reset();
   }, [viewKey]);
 
   const navHandlers: SpectrumNavHandlers = {

@@ -37,7 +37,7 @@ dark (near-black canvas for spectrum readability)
 - Top bar: brand + hero VFO (digit display) + Connect / Demo / Stop
 - Primary toolbar: mode chips · volume · band presets (always visible)
 - Main: Scope (spectrum over waterfall) or full-bleed 3D spectrometer — toggle in pane header
-- Right rail (~22rem), tabbed: Radio (freq detail, BW/squelch/offset, sample rate, audio/RF, GMRS channels, setup) · Decode (Morse / FSK / FT8 / Fax · schedule/map/reachability / Trunk / Speech) · Identify (signal ID · callsign lookup)
+- Right rail (~22rem), tabbed: Radio (freq detail, BW/squelch/offset, sample rate, audio/RF, GMRS channels, shortwave explorer, setup) · Decode (Morse / FSK / FT8 / Fax · schedule/map/reachability / Trunk / Speech) · Identify (signal ID · callsign lookup)
 - Bottom status strip: tune / center / mode / rate
 - Empty spectrum: Connect + Demo CTAs inline
 

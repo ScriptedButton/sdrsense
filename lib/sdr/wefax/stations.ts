@@ -559,3 +559,21 @@ export function formatWefaxKhz(assignedHz: number): string {
   const khz = assignedHz / 1_000;
   return Number.isInteger(khz) ? String(khz) : khz.toFixed(1);
 }
+
+/**
+ * USB dial frequencies used by FakeRtl so station Tune chips hear fax in Demo.
+ * Includes every published carrier (assigned − 1.9 kHz).
+ */
+export function wefaxDemoCarriersHz(): number[] {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const station of WEFAX_STATIONS) {
+    for (const freq of station.frequencies) {
+      const hz = wefaxTuneHz(freq.assignedHz);
+      if (seen.has(hz)) continue;
+      seen.add(hz);
+      out.push(hz);
+    }
+  }
+  return out;
+}

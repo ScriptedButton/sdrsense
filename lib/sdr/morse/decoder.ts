@@ -130,9 +130,7 @@ export class MorseDecoder {
     if (this.goertzelN < this.goertzelBlock) return null;
 
     const power =
-      this.s1 * this.s1 +
-      this.s2 * this.s2 -
-      this.coeff * this.s1 * this.s2;
+      this.s1 * this.s1 + this.s2 * this.s2 - this.coeff * this.s1 * this.s2;
     this.s1 = 0;
     this.s2 = 0;
     this.goertzelN = 0;
@@ -203,11 +201,7 @@ export class MorseDecoder {
       if (this.config.autoSpeed) this.updateDit(samples);
     } else {
       this.elements += "-";
-      if (
-        this.config.autoSpeed &&
-        samples > dit * 2.2 &&
-        samples < dit * 4.5
-      ) {
+      if (this.config.autoSpeed && samples > dit * 2.2 && samples < dit * 4.5) {
         this.updateDit(samples / 3);
       }
     }

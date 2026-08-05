@@ -1,9 +1,13 @@
 /**
- * Offline FT8 encode → decode smoke test.
+ * Offline FT8 encode → decode smoke test + keyword enrichment.
  * Run: pnpm exec tsx scripts/ft8-smoke.ts
  */
 import { decodeFT8, encodeFT8, HashCallBook } from "@e04/ft8ts";
 
+import {
+  findFt8Keywords,
+  uniqueFt8Keywords,
+} from "../lib/sdr/ft8/keywords";
 import { extractFt8Symbols } from "../lib/sdr/ft8/symbols";
 import { FT8_DECODE_RATE } from "../lib/sdr/ft8/types";
 
@@ -54,4 +58,63 @@ if (!ok) {
   console.error("FAIL: expected CQ K1ABC in both paths");
   process.exit(1);
 }
+
+const sampleMsgs = [
+  "CQ K1ABC FN42",
+  "K1ABC W1AW -12",
+  "W1AW K1ABC R-10",
+  "K1ABC W1AW RR73",
+  "CQ POTA W1AW FN31",
+];
+
+for (const msg of sampleMsgs) {
+  const kinds = Object.fromEntries(
+    findFt8Keywords(msg).map((h) => [h.token, h.kind]),
+  );
+  console.log(`keywords ${JSON.stringify(msg)}:`, kinds);
+}
+
+const cqHits = findFt8Keywords("CQ K1ABC FN42");
+for (const [token, kind] of [
+  ["CQ", "procedure"],
+  ["K1ABC", "callsign"],
+  ["FN42", "grid"],
+] as const) {
+  const hit = cqHits.find((h) => h.token === token);
+  if (!hit || hit.kind !== kind) {
+    console.error(`FAIL: expected ${token} as ${kind}`);
+    process.exit(1);
+  }
+}
+
+const report = findFt8Keywords("K1ABC W1AW R+05").find(
+  (h) => h.token === "R+05",
+);
+if (!report || report.kind !== "report") {
+  console.error("FAIL: expected R+05 as report");
+  process.exit(1);
+}
+
+const portable = findFt8Keywords("CQ W1AW/QRP FN31").find(
+  (h) => h.kind === "callsign",
+);
+if (!portable || portable.token !== "W1AW") {
+  console.error("FAIL: expected portable W1AW/QRP → callsign W1AW");
+  process.exit(1);
+}
+
+const unique = uniqueFt8Keywords([
+  { msg: "CQ K1ABC FN42" },
+  { msg: "CQ K1ABC FN42" },
+  { msg: "K1ABC W1AW RR73" },
+]);
+if (unique.filter((h) => h.token === "CQ").length !== 1) {
+  console.error("FAIL: unique keywords should dedupe CQ");
+  process.exit(1);
+}
+if (!unique.some((h) => h.token === "W1AW" && h.kind === "callsign")) {
+  console.error("FAIL: expected W1AW in unique keywords");
+  process.exit(1);
+}
+
 console.log("OK");

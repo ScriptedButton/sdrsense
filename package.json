@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "train:signal-id": "tsx scripts/signal-id/train.ts",
-    "fetch:signal-catalog": "tsx scripts/signal-id/fetch-catalog.ts"
+    "fetch:signal-catalog": "tsx scripts/signal-id/fetch-catalog.ts",
+    "fetch:shortwave": "tsx scripts/shortwave/fetch-schedule.ts"
   },
   "dependencies": {
     "@e04/ft8ts": "^0.0.14",

@@ -1,7 +1,9 @@
 "use client";
 
+import { NoiseFilterControl } from "@/components/sdr/noise-filter-control";
 import type {
   DbRangeId,
+  NoiseFilterId,
   WaterfallDirectionId,
   WaterfallPaletteId,
   WaterfallSpeedId,
@@ -17,10 +19,12 @@ type WaterfallControlsProps = {
   speed: WaterfallSpeedId;
   direction: WaterfallDirectionId;
   dbRange: DbRangeId;
+  noiseFilter: NoiseFilterId;
   onPaletteChange: (id: WaterfallPaletteId) => void;
   onSpeedChange: (id: WaterfallSpeedId) => void;
   onDirectionChange: (id: WaterfallDirectionId) => void;
   onDbRangeChange: (id: DbRangeId) => void;
+  onNoiseFilterChange: (id: NoiseFilterId) => void;
 };
 
 export function WaterfallControls({
@@ -28,10 +32,12 @@ export function WaterfallControls({
   speed,
   direction,
   dbRange,
+  noiseFilter,
   onPaletteChange,
   onSpeedChange,
   onDirectionChange,
   onDbRangeChange,
+  onNoiseFilterChange,
 }: WaterfallControlsProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -99,6 +105,11 @@ export function WaterfallControls({
           ))}
         </select>
       </label>
+
+      <NoiseFilterControl
+        value={noiseFilter}
+        onChange={onNoiseFilterChange}
+      />
     </div>
   );
 }

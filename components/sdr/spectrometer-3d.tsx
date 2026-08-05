@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import { useSpectrumStream } from "@/components/sdr/sdr-provider";
+import type { NoiseFilterId } from "@/lib/sdr/display-settings";
 import { Spectrometer3DScene } from "@/lib/sdr/spectrometer-3d-scene";
+import { SpectrumNoiseFilter } from "@/lib/sdr/spectrum-noise-filter";
 
 type Spectrometer3DProps = {
   sampleRate: number;
   offsetHz: number;
   bandwidthHz: number;
+  noiseFilter?: NoiseFilterId;
   onTuneOffset?: (offsetHz: number) => void;
 };
 
@@ -16,14 +19,22 @@ export function Spectrometer3D({
   sampleRate,
   offsetHz,
   bandwidthHz,
+  noiseFilter = "off",
   onTuneOffset,
 }: Spectrometer3DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<Spectrometer3DScene | null>(null);
   const sampleRateRef = useRef(sampleRate);
   const onTuneRef = useRef(onTuneOffset);
+  const noiseFilterRef = useRef(new SpectrumNoiseFilter());
+  const noiseStrengthRef = useRef(noiseFilter);
   sampleRateRef.current = sampleRate;
   onTuneRef.current = onTuneOffset;
+  noiseStrengthRef.current = noiseFilter;
+
+  useEffect(() => {
+    noiseFilterRef.current.reset();
+  }, [noiseFilter]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -54,7 +65,11 @@ export function Spectrometer3D({
 
   useSpectrumStream(
     useCallback((spectrum) => {
-      sceneRef.current?.pushSpectrum(spectrum);
+      const filtered = noiseFilterRef.current.apply(
+        spectrum,
+        noiseStrengthRef.current,
+      );
+      sceneRef.current?.pushSpectrum(filtered);
     }, []),
   );
 

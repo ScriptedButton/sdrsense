@@ -5,8 +5,10 @@ import {
   useFt8State,
   useSdrState,
 } from "@/components/sdr/sdr-provider";
+import { Ft8KeywordChips } from "@/components/sdr/ft8/ft8-keyword-chips";
 import { Ft8MessageList } from "@/components/sdr/ft8/ft8-message-list";
 import { Ft8Settings } from "@/components/sdr/ft8/ft8-settings";
+import { uniqueFt8Keywords } from "@/lib/sdr/ft8/keywords";
 import { DEMO_FT8_FREQUENCY_HZ, FT8_CYCLE_SEC } from "@/lib/sdr/ft8/types";
 
 export function Ft8Panel() {
@@ -15,6 +17,7 @@ export function Ft8Panel() {
   const ft8 = useFt8State();
   const live = radio.status === "playing";
   const remaining = Math.max(0, FT8_CYCLE_SEC - ft8.cycleSec);
+  const keywords = uniqueFt8Keywords(ft8.messages);
 
   const statusLabel = (() => {
     switch (ft8.status) {
@@ -96,12 +99,14 @@ export function Ft8Panel() {
       ) : null}
 
       <Ft8Settings />
+      <Ft8KeywordChips keywords={keywords} />
       <Ft8MessageList messages={ft8.messages} enabled={ft8.enabled} />
 
       <p className="mt-2 text-[0.65rem] leading-relaxed text-muted">
         Use USB (or LSB) with squelch open. Demo mode has FT8 at{" "}
         {(DEMO_FT8_FREQUENCY_HZ / 1e6).toFixed(3)} MHz — tune there, select USB,
-        then Decode. Decodes run on each UTC 15 s boundary.
+        then Decode. Decodes run on each UTC 15 s boundary. CQ, reports, and
+        grids are identified; click a callsign to look it up.
       </p>
     </fieldset>
   );

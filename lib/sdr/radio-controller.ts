@@ -53,7 +53,7 @@ import type {
   P25Listener,
   P25State,
 } from "./p25/types";
-import { createDemoWefaxGenerator } from "./wefax/demo-signal";
+import { createDemoWefaxBank } from "./wefax/demo-signal";
 import { WefaxDecoderEngine } from "./wefax/engine";
 import type {
   WefaxConfig,
@@ -61,6 +61,8 @@ import type {
   WefaxPresetId,
   WefaxState,
 } from "./wefax/types";
+import { DEMO_WEFAX_FREQUENCY_HZ } from "./wefax/types";
+import { wefaxDemoCarriersHz } from "./wefax/stations";
 import {
   SignalIdEngine,
   type SignalIdSensitivity,
@@ -100,6 +102,7 @@ function isWebUsbSupported(): boolean {
 }
 
 function createDemoGenerator() {
+  const wefaxCarriers = [DEMO_WEFAX_FREQUENCY_HZ, ...wefaxDemoCarriersHz()];
   return sum(
     modulateFM(93.9e6, 75_000, 0.1, wbfmSignal(tone(600, 0.5), tone(400, 0.5))),
     modulateFM(88.5e6, 75_000, 0.08, wbfmSignal(tone(440, 0.5))),
@@ -109,7 +112,7 @@ function createDemoGenerator() {
     createDemoFt8Generator(0.05),
     createDemoMorseGenerator(0.06),
     createDemoP25Generator(0.08),
-    createDemoWefaxGenerator(0.05),
+    createDemoWefaxBank(wefaxCarriers, 0.06),
     noise(0.03),
   );
 }
@@ -564,12 +567,16 @@ export class RadioController {
   }
 
   setBandwidth(hz: number): void {
-    if (!this.demodulator) return;
-    const params = modeParameters(this.demodulator.getMode());
+    const scheme = this.state.scheme;
+    const base =
+      this.demodulator?.getMode() ??
+      this.knownModes[scheme] ??
+      getMode(scheme);
+    const params = modeParameters(base);
     if (!params.hasBandwidth()) return;
     const next = params.setBandwidth(hz);
-    this.demodulator.setMode(next.mode);
     this.knownModes[next.mode.scheme] = next.mode;
+    this.demodulator?.setMode(next.mode);
     this.patch({ bandwidthHz: next.getBandwidth() });
   }
 

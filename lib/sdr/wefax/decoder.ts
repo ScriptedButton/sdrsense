@@ -41,12 +41,13 @@ export class WefaxDecoder {
   private toneEma = 1900;
   private lockEma = 0;
 
-  // Goertzel APT detectors (start 300/675, stop 450)
+  // Goertzel APT detectors on demodulated gray level (B/W FSK rate)
   private aptN = 0;
   private aptBlock = 0;
   private g300: Goertzel = { s1: 0, s2: 0, coeff: 0 };
   private g450: Goertzel = { s1: 0, s2: 0, coeff: 0 };
   private g675: Goertzel = { s1: 0, s2: 0, coeff: 0 };
+  private aptLevelDc = 0.5;
   private aptToneMs = 0;
   private aptCandidate: WefaxIoc | null = null;
   private stopToneMs = 0;
@@ -166,7 +167,7 @@ export class WefaxDecoder {
       this.lockEma = this.lockEma * 0.997 + sep * Math.min(1, amp * 8) * 0.003;
 
       if (this.config.sync === "auto") {
-        this.observeApt(sample, freqHz, amp);
+        this.observeApt(level, amp);
       }
 
       if (this.status === "phasing") {
@@ -228,6 +229,7 @@ export class WefaxDecoder {
     this.aptToneMs = 0;
     this.aptCandidate = null;
     this.stopToneMs = 0;
+    this.aptLevelDc = 0.5;
     this.g300.s1 = 0;
     this.g300.s2 = 0;
     this.g450.s1 = 0;
@@ -274,10 +276,16 @@ export class WefaxDecoder {
     return clamp01(level);
   }
 
-  private observeApt(sample: number, _freqHz: number, _amp: number): void {
-    goertzelAcc(this.g300, sample);
-    goertzelAcc(this.g450, sample);
-    goertzelAcc(this.g675, sample);
+  /**
+   * ITU APT is black/white FSK alternating at 300/675/450 Hz — not a baseband
+   * sine. Detect that modulation rate on the AC-coupled gray level.
+   */
+  private observeApt(level: number, amp: number): void {
+    this.aptLevelDc = this.aptLevelDc * 0.995 + level * 0.005;
+    const ac = level - this.aptLevelDc;
+    goertzelAcc(this.g300, ac);
+    goertzelAcc(this.g450, ac);
+    goertzelAcc(this.g675, ac);
     this.aptN += 1;
 
     if (this.aptN < this.aptBlock) return;
@@ -286,12 +294,15 @@ export class WefaxDecoder {
     const p450 = goertzelPower(this.g450);
     const p675 = goertzelPower(this.g675);
     const blockMs = (this.aptBlock / this.sampleRate) * 1000;
-    // Absolute floor — rejects hiss; scale roughly with block length.
-    const floor = this.aptBlock * 0.002;
+    // Level AC is ~±0.5; power scales ~N². Reject hiss / no-carrier.
+    const floor = this.aptBlock * this.aptBlock * 0.004;
+    const hasCarrier = amp > 0.02;
 
     if (this.status === "listening" || this.status === "starting") {
-      const ioc576 = p300 > floor && p300 > p450 * 2.5 && p300 > p675 * 2.5;
-      const ioc288 = p675 > floor && p675 > p450 * 2.5 && p675 > p300 * 2.5;
+      const ioc576 =
+        hasCarrier && p300 > floor && p300 > p450 * 2.5 && p300 > p675 * 2.5;
+      const ioc288 =
+        hasCarrier && p675 > floor && p675 > p450 * 2.5 && p675 > p300 * 2.5;
       if (ioc576 || ioc288) {
         const cand: WefaxIoc = ioc576 ? 576 : 288;
         if (this.aptCandidate !== cand) {
@@ -312,8 +323,13 @@ export class WefaxDecoder {
       }
     }
 
-    if (this.status === "imaging" || this.status === "phasing") {
-      const stop = p450 > floor && p450 > p300 * 2.5 && p450 > p675 * 2.5;
+    if (
+      this.status === "imaging" ||
+      this.status === "phasing" ||
+      this.status === "stopped"
+    ) {
+      const stop =
+        hasCarrier && p450 > floor && p450 > p300 * 2.5 && p450 > p675 * 2.5;
       if (stop) {
         this.stopToneMs += blockMs;
         if (this.stopToneMs >= 2_000) {
@@ -321,6 +337,13 @@ export class WefaxDecoder {
         }
       } else {
         this.stopToneMs = Math.max(0, this.stopToneMs - blockMs * 0.5);
+        // Re-arm once the stop FSK ends so the next chart can lock.
+        if (this.status === "stopped" && this.stopToneMs < 400) {
+          this.status = "listening";
+          this.aptToneMs = 0;
+          this.aptCandidate = null;
+          this.stopToneMs = 0;
+        }
       }
     }
 

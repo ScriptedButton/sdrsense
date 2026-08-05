@@ -118,9 +118,9 @@ export const DEMO_WEFAX_FREQUENCY_HZ = 12_625_000;
 /** Cap image height so the rail canvas stays bounded. */
 export const WEFAX_MAX_LINES = 2_400;
 
-/** APT start tone → IOC 576 (ITU). */
+/** APT start B/W FSK rate → IOC 576 (ITU). */
 export const WEFAX_APT_START_IOC576_HZ = 300;
-/** APT start tone → IOC 288. */
+/** APT start B/W FSK rate → IOC 288. */
 export const WEFAX_APT_START_IOC288_HZ = 675;
-/** APT stop tone. */
+/** APT stop B/W FSK rate. */
 export const WEFAX_APT_STOP_HZ = 450;
