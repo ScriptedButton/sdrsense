@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { FrequencyDigitDisplay } from "@/components/sdr/frequency-digit-display";
 import { useRadioController, useSdrState } from "@/components/sdr/sdr-provider";
-import { formatFrequencyCompact, parseFrequencyInput } from "@/lib/sdr/format";
+import {
+  FREQ_FORMAT_OPTIONS,
+  type FreqFormatId,
+  type FreqTargetId,
+} from "@/lib/sdr/display-settings";
+import {
+  formatFrequencyCompact,
+  formatFrequencyWith,
+  parseFrequencyInput,
+} from "@/lib/sdr/format";
 
 const STEPS = [
   { label: "1 Hz", hz: 1 },
@@ -16,38 +26,135 @@ const STEPS = [
   { label: "1 MHz", hz: 1_000_000 },
 ] as const;
 
-export function FrequencyControl() {
+type FrequencyControlProps = {
+  freqTarget: FreqTargetId;
+  freqFormat: FreqFormatId;
+  onFreqTargetChange: (id: FreqTargetId) => void;
+  onFreqFormatChange: (id: FreqFormatId) => void;
+  /** Hero VFO lives in the header; rail can skip the digit row. */
+  showDigits?: boolean;
+};
+
+export function FrequencyControl({
+  freqTarget,
+  freqFormat,
+  onFreqTargetChange,
+  onFreqFormatChange,
+  showDigits = true,
+}: FrequencyControlProps) {
   const controller = useRadioController();
   const state = useSdrState();
-  const [draft, setDraft] = useState(formatFrequencyCompact(state.frequencyHz));
+  const displayHz =
+    freqTarget === "tune"
+      ? state.frequencyHz + state.offsetHz
+      : state.frequencyHz;
+
+  const [draft, setDraft] = useState(formatFrequencyCompact(displayHz));
   const [unit, setUnit] = useState<"MHz" | "kHz" | "Hz">("MHz");
   const [stepHz, setStepHz] = useState(100_000);
 
   useEffect(() => {
-    setDraft(formatFrequencyCompact(state.frequencyHz));
-    if (state.frequencyHz >= 1e6) setUnit("MHz");
-    else if (state.frequencyHz >= 1e3) setUnit("kHz");
+    setDraft(formatFrequencyCompact(displayHz));
+    if (displayHz >= 1e6) setUnit("MHz");
+    else if (displayHz >= 1e3) setUnit("kHz");
     else setUnit("Hz");
-  }, [state.frequencyHz]);
+  }, [displayHz]);
+
+  const setAbsolute = useCallback(
+    (hz: number) => {
+      if (freqTarget === "tune") {
+        controller.tuneToHz(hz);
+      } else {
+        void controller.setFrequency(hz);
+      }
+    },
+    [controller, freqTarget],
+  );
+
+  const nudge = useCallback(
+    (deltaHz: number) => {
+      if (freqTarget === "tune") {
+        controller.tuneToHz(displayHz + deltaHz);
+      } else {
+        void controller.nudgeFrequency(deltaHz);
+      }
+    },
+    [controller, displayHz, freqTarget],
+  );
 
   const commit = () => {
     const hz = parseFrequencyInput(draft, unit);
     if (hz == null) {
-      setDraft(formatFrequencyCompact(state.frequencyHz));
+      setDraft(formatFrequencyCompact(displayHz));
       return;
     }
-    void controller.setFrequency(hz);
+    setAbsolute(hz);
   };
 
   return (
     <fieldset className="control-group">
       <legend className="control-label">Frequency</legend>
-      <div className="flex items-stretch gap-1.5">
+
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className={`mode-chip ${freqTarget === "tune" ? "mode-chip-active" : ""}`}
+            aria-pressed={freqTarget === "tune"}
+            onClick={() => onFreqTargetChange("tune")}
+          >
+            Tune
+          </button>
+          <button
+            type="button"
+            className={`mode-chip ${freqTarget === "center" ? "mode-chip-active" : ""}`}
+            aria-pressed={freqTarget === "center"}
+            onClick={() => onFreqTargetChange("center")}
+          >
+            Center
+          </button>
+        </div>
+        <label className="ml-auto flex items-center gap-1.5 text-[0.65rem] text-muted">
+          Format
+          <select
+            className="input-sm"
+            value={freqFormat}
+            aria-label="Frequency readout format"
+            onChange={(e) =>
+              onFreqFormatChange(e.target.value as FreqFormatId)
+            }
+          >
+            {FREQ_FORMAT_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {showDigits && (
+        <FrequencyDigitDisplay
+          frequencyHz={displayHz}
+          onChange={setAbsolute}
+          size="md"
+        />
+      )}
+
+      <p className={`${showDigits ? "mt-1.5" : ""} font-mono text-[0.7rem] tabular-nums text-accent`}>
+        {formatFrequencyWith(displayHz, freqFormat)}
+        <span className="text-muted">
+          {" "}
+          · {freqTarget === "tune" ? "listen" : "LO"}
+        </span>
+      </p>
+
+      <div className="mt-2 flex items-stretch gap-1.5">
         <button
           type="button"
           className="btn-icon"
           aria-label={`Decrease by ${stepHz} Hz`}
-          onClick={() => void controller.nudgeFrequency(-stepHz)}
+          onClick={() => nudge(-stepHz)}
         >
           −
         </button>
@@ -63,7 +170,9 @@ export function FrequencyControl() {
               }
             }}
             inputMode="decimal"
-            aria-label="Center frequency"
+            aria-label={
+              freqTarget === "tune" ? "Tune frequency" : "Center frequency"
+            }
           />
           <select
             className="border-l border-line bg-transparent px-2 text-sm text-muted outline-none"
@@ -80,7 +189,7 @@ export function FrequencyControl() {
           type="button"
           className="btn-icon"
           aria-label={`Increase by ${stepHz} Hz`}
-          onClick={() => void controller.nudgeFrequency(stepHz)}
+          onClick={() => nudge(stepHz)}
         >
           +
         </button>

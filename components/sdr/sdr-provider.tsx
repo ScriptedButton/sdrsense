@@ -11,6 +11,13 @@ import {
 } from "react";
 
 import { RadioController } from "@/lib/sdr/radio-controller";
+import type { FskState } from "@/lib/sdr/fsk/types";
+import { DEFAULT_FSK_CONFIG } from "@/lib/sdr/fsk/types";
+import type { Ft8State } from "@/lib/sdr/ft8/types";
+import { DEFAULT_FT8_CONFIG } from "@/lib/sdr/ft8/types";
+import type { MorseState } from "@/lib/sdr/morse/types";
+import { DEFAULT_MORSE_CONFIG } from "@/lib/sdr/morse/types";
+import type { SignalIdState } from "@/lib/sdr/signal-id/types";
 import type { TranscriptionState } from "@/lib/sdr/transcription-engine";
 import { DEFAULT_SAMPLE_RATE, type SdrState } from "@/lib/sdr/types";
 
@@ -29,6 +36,8 @@ const SERVER_STATE: SdrState = {
   gainDb: 20,
   bandwidthHz: 150_000,
   squelch: 0,
+  autoSquelch: false,
+  squelchOpen: true,
   stereo: true,
   stereoActive: false,
   ppm: 0,
@@ -104,5 +113,92 @@ export function useTranscriptionState() {
       }),
     () => controller.getTranscriptionState(),
     () => SERVER_TRANSCRIPTION,
+  );
+}
+
+const SERVER_FSK: FskState = {
+  enabled: false,
+  status: "idle",
+  config: DEFAULT_FSK_CONFIG,
+  text: "",
+  lastChar: null,
+  lock: 0,
+  error: null,
+};
+
+export function useFskState(): FskState {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeFsk(() => {
+        onStoreChange();
+      }),
+    () => controller.getFskState(),
+    () => SERVER_FSK,
+  );
+}
+
+const SERVER_FT8: Ft8State = {
+  enabled: false,
+  status: "idle",
+  config: DEFAULT_FT8_CONFIG,
+  messages: [],
+  cycleSec: 0,
+  error: null,
+};
+
+export function useFt8State(): Ft8State {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeFt8(() => {
+        onStoreChange();
+      }),
+    () => controller.getFt8State(),
+    () => SERVER_FT8,
+  );
+}
+
+const SERVER_MORSE: MorseState = {
+  enabled: false,
+  status: "idle",
+  config: DEFAULT_MORSE_CONFIG,
+  text: "",
+  keywords: [],
+  lastChar: null,
+  wpmEstimate: DEFAULT_MORSE_CONFIG.wpm,
+  lock: 0,
+  error: null,
+};
+
+export function useMorseState(): MorseState {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeMorse(() => {
+        onStoreChange();
+      }),
+    () => controller.getMorseState(),
+    () => SERVER_MORSE,
+  );
+}
+
+const SERVER_SIGNAL_ID: SignalIdState = {
+  enabled: false,
+  status: "idle",
+  signals: [],
+  noiseFloorDb: -100,
+  error: null,
+};
+
+export function useSignalIdState(): SignalIdState {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeSignalId(() => {
+        onStoreChange();
+      }),
+    () => controller.getSignalIdState(),
+    () => SERVER_SIGNAL_ID,
   );
 }

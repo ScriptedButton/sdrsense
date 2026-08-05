@@ -5,9 +5,10 @@ import { formatFrequency } from "@/lib/sdr/format";
 
 export function StatusBar() {
   const state = useSdrState();
+  const live = state.status === "playing";
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-xs text-muted">
+    <footer className="status-bar">
       <span>
         Tune{" "}
         <span className="font-mono text-ink">
@@ -29,11 +30,22 @@ export function StatusBar() {
           {(state.sampleRate / 1e6).toFixed(3)} Msps
         </span>
       </span>
+      <span>
+        Vol{" "}
+        <span className="font-mono text-ink">
+          {Math.round(state.volume * 100)}%
+        </span>
+      </span>
+      {live && (state.autoSquelch || state.squelch > 0) && (
+        <span className={state.squelchOpen ? "text-accent" : undefined}>
+          Sq {state.squelchOpen ? "open" : "closed"}
+        </span>
+      )}
       {state.connection !== "disconnected" && (
         <span className="text-accent">
           {state.connection === "demo" ? "Simulated stick" : "RTL-SDR WebUSB"}
         </span>
       )}
-    </div>
+    </footer>
   );
 }

@@ -20,6 +20,43 @@ import { Radio, RtlProvider } from "@jtarrio/webrtlsdr/radio.js";
 import { DirectSampling } from "@jtarrio/webrtlsdr/rtlsdr.js";
 
 import { clamp } from "./format";
+import { createDemoFskGenerator } from "./fsk/demo-signal";
+import {
+  FskDecoderEngine,
+} from "./fsk/engine";
+import type {
+  FskConfig,
+  FskListener,
+  FskPresetId,
+  FskState,
+} from "./fsk/types";
+import { createDemoFt8Generator } from "./ft8/demo-signal";
+import { Ft8DecoderEngine } from "./ft8/engine";
+import type {
+  Ft8Config,
+  Ft8Listener,
+  Ft8State,
+} from "./ft8/types";
+import { createDemoMorseGenerator } from "./morse/demo-signal";
+import { MorseDecoderEngine } from "./morse/engine";
+import type {
+  MorseConfig,
+  MorseListener,
+  MorsePresetId,
+  MorseState,
+} from "./morse/types";
+import {
+  SignalIdEngine,
+  type SignalIdSensitivity,
+} from "./signal-id/engine";
+import type { SignalIdListener, SignalIdState } from "./signal-id/types";
+import {
+  AUTO_SQUELCH_DEFAULT_MARGIN_DB,
+  SQUELCH_DEFAULT_DB,
+  SQUELCH_MAX_DB,
+  SQUELCH_MIN_DB,
+  SquelchGate,
+} from "./squelch";
 import { TappingPlayer } from "./tapping-player";
 import {
   TranscriptionEngine,
@@ -29,6 +66,7 @@ import {
 import {
   DEFAULT_SAMPLE_RATE,
   FFT_SIZE,
+  nearestSampleRate,
   type ConnectionMode,
   type DemodScheme,
   type SdrState,
@@ -51,6 +89,9 @@ function createDemoGenerator() {
     modulateFM(88.5e6, 75_000, 0.08, wbfmSignal(tone(440, 0.5))),
     modulateAM(810e3, 0.1, tone(900, 0.5)),
     tone(14_225_750, 0.01),
+    createDemoFskGenerator(0.09),
+    createDemoFt8Generator(0.05),
+    createDemoMorseGenerator(0.06),
     noise(0.03),
   );
 }
@@ -79,13 +120,22 @@ export class RadioController {
   private player: TappingPlayer | null = null;
   private untap: (() => void) | null = null;
   private readonly transcription = new TranscriptionEngine();
+  private readonly fsk = new FskDecoderEngine();
+  private readonly ft8 = new Ft8DecoderEngine();
+  private readonly morse = new MorseDecoderEngine();
+  private readonly signalId = new SignalIdEngine();
+  private readonly squelchGate = new SquelchGate();
   private spectrumBuffer = new Float32Array(FFT_SIZE);
   private knownModes: Record<string, ReturnType<typeof getMode>> = {};
   private stateListeners = new Set<StateListener>();
   private spectrumListeners = new Set<SpectrumListener>();
+  private lastSquelchEvalMs = 0;
   private onSampleClick = () => this.emitSpectrum();
   private onTapAudio = (mono: Float32Array, sampleRate: number) => {
     this.transcription.pushAudio(mono, sampleRate);
+    this.fsk.pushAudio(mono, sampleRate);
+    this.ft8.pushAudio(mono, sampleRate);
+    this.morse.pushAudio(mono, sampleRate);
   };
 
   private state: SdrState = {
@@ -99,7 +149,9 @@ export class RadioController {
     autoGain: true,
     gainDb: 20,
     bandwidthHz: 150_000,
-    squelch: 0,
+    squelch: SQUELCH_DEFAULT_DB,
+    autoSquelch: false,
+    squelchOpen: true,
     stereo: true,
     stereoActive: false,
     ppm: 0,
@@ -137,12 +189,113 @@ export class RadioController {
   }
 
   async setTranscriptionEnabled(enabled: boolean): Promise<void> {
-    this.player?.setTapping(enabled);
     await this.transcription.setEnabled(enabled);
+    this.syncTapping();
   }
 
   clearTranscript(): void {
     this.transcription.clear();
+  }
+
+  getFskState(): FskState {
+    return this.fsk.getState();
+  }
+
+  subscribeFsk(listener: FskListener): () => void {
+    return this.fsk.subscribe(listener);
+  }
+
+  setFskEnabled(enabled: boolean): void {
+    this.fsk.setEnabled(enabled);
+    this.syncTapping();
+  }
+
+  setFskPreset(preset: Exclude<FskPresetId, "custom">): void {
+    this.fsk.setPreset(preset);
+  }
+
+  patchFskConfig(partial: Partial<FskConfig>): void {
+    this.fsk.patchConfig(partial);
+  }
+
+  setFskInverted(inverted: boolean): void {
+    this.fsk.setInverted(inverted);
+  }
+
+  clearFskText(): void {
+    this.fsk.clear();
+  }
+
+  getFt8State(): Ft8State {
+    return this.ft8.getState();
+  }
+
+  subscribeFt8(listener: Ft8Listener): () => void {
+    return this.ft8.subscribe(listener);
+  }
+
+  setFt8Enabled(enabled: boolean): void {
+    this.ft8.setEnabled(enabled);
+    this.syncTapping();
+  }
+
+  patchFt8Config(partial: Partial<Ft8Config>): void {
+    this.ft8.patchConfig(partial);
+  }
+
+  clearFt8Messages(): void {
+    this.ft8.clear();
+  }
+
+  getMorseState(): MorseState {
+    return this.morse.getState();
+  }
+
+  subscribeMorse(listener: MorseListener): () => void {
+    return this.morse.subscribe(listener);
+  }
+
+  setMorseEnabled(enabled: boolean): void {
+    this.morse.setEnabled(enabled);
+    this.syncTapping();
+  }
+
+  setMorsePreset(preset: Exclude<MorsePresetId, "custom">): void {
+    this.morse.setPreset(preset);
+  }
+
+  patchMorseConfig(partial: Partial<MorseConfig>): void {
+    this.morse.patchConfig(partial);
+  }
+
+  clearMorseText(): void {
+    this.morse.clear();
+  }
+
+  getSignalIdState(): SignalIdState {
+    return this.signalId.getState();
+  }
+
+  subscribeSignalId(listener: SignalIdListener): () => void {
+    return this.signalId.subscribe(listener);
+  }
+
+  setSignalIdEnabled(enabled: boolean): void {
+    this.signalId.setEnabled(enabled);
+  }
+
+  getSignalIdSensitivity(): SignalIdSensitivity {
+    return this.signalId.getSensitivity();
+  }
+
+  setSignalIdSensitivity(sensitivity: SignalIdSensitivity): void {
+    this.signalId.setSensitivity(sensitivity);
+  }
+
+  /** Tunes to an identified signal, switching demodulator to match its class. */
+  tuneToSignal(offsetHz: number, scheme: DemodScheme | null): void {
+    if (scheme) this.setScheme(scheme);
+    this.setOffset(offsetHz);
   }
 
   getSchemes(): string[] {
@@ -185,6 +338,8 @@ export class RadioController {
   async setFrequency(hz: number): Promise<void> {
     const frequencyHz = clamp(Math.round(hz), 0, 1_766_000_000);
     this.patch({ frequencyHz });
+    // Retuning invalidates every tracked signal and the frame history behind it.
+    this.signalId.reset();
     if (this.radio) await this.radio.setFrequency(frequencyHz);
   }
 
@@ -192,10 +347,85 @@ export class RadioController {
     await this.setFrequency(this.state.frequencyHz + deltaHz);
   }
 
+  /**
+   * Change the capture sample rate (spectrum width). webrtlsdr only applies
+   * the rate on start, so a live session is briefly stopped and restarted.
+   */
+  async setSampleRate(hz: number): Promise<void> {
+    const requested = nearestSampleRate(hz);
+    if (requested === this.state.sampleRate) return;
+
+    const half = requested / 2;
+    const offsetHz = clamp(this.state.offsetHz, -half, half);
+    this.patch({ sampleRate: requested, offsetHz, error: null });
+    this.signalId.reset();
+    this.demodulator?.setFrequencyOffset(offsetHz);
+
+    if (!this.radio) return;
+
+    const wasPlaying = this.radio.isPlaying();
+    try {
+      if (wasPlaying) {
+        this.patch({ status: "starting" });
+        await this.radio.stop();
+      }
+      await this.radio.setSampleRate(requested);
+      if (wasPlaying) {
+        await this.radio.start();
+        const actual = this.radio.getSampleRate();
+        const halfActual = actual / 2;
+        this.patch({
+          sampleRate: actual,
+          offsetHz: clamp(offsetHz, -halfActual, halfActual),
+          status: "playing",
+        });
+        this.demodulator?.setFrequencyOffset(this.state.offsetHz);
+      }
+    } catch (err) {
+      this.patch({
+        status: "error",
+        error: errorMessage(err),
+      });
+    }
+  }
+
   setOffset(hz: number): void {
-    const offsetHz = Math.round(hz);
+    const half = this.state.sampleRate / 2;
+    const offsetHz = clamp(Math.round(hz), -half, half);
     this.patch({ offsetHz });
     this.demodulator?.setFrequencyOffset(offsetHz);
+  }
+
+  /**
+   * Tune the demodulator to an absolute frequency. Uses the offset when the
+   * target sits comfortably inside the current sample window; otherwise retunes
+   * the LO and clears the offset.
+   */
+  tuneToHz(absoluteHz: number): void {
+    const target = Math.round(absoluteHz);
+    const half = this.state.sampleRate / 2;
+    const offset = target - this.state.frequencyHz;
+    if (Math.abs(offset) <= half * 0.92) {
+      this.setOffset(offset);
+      return;
+    }
+    void this.setFrequency(target).then(() => this.setOffset(0));
+  }
+
+  /** Retune the LO so `absoluteHz` sits at center and clear the offset. */
+  centerOnHz(absoluteHz: number): void {
+    void this.setFrequency(Math.round(absoluteHz)).then(() => this.setOffset(0));
+  }
+
+  /**
+   * Slide the LO by `deltaHz` while keeping the absolute listen frequency
+   * stable (offset absorbs the opposite of the LO move).
+   */
+  async panFrequency(deltaHz: number): Promise<void> {
+    if (deltaHz === 0) return;
+    const listenHz = this.state.frequencyHz + this.state.offsetHz;
+    await this.setFrequency(this.state.frequencyHz + deltaHz);
+    this.setOffset(listenHz - this.state.frequencyHz);
   }
 
   setVolume(volume: number): void {
@@ -223,10 +453,15 @@ export class RadioController {
     const mode = this.knownModes[scheme];
     this.demodulator?.setMode(mode);
     const params = modeParameters(mode);
+    // Keep app squelch settings; library squelch stays at 0 (we gate in the player).
+    if (params.hasSquelch()) {
+      const cleared = params.setSquelch(0);
+      this.demodulator?.setMode(cleared.mode);
+      this.knownModes[scheme] = cleared.mode;
+    }
     this.patch({
       scheme,
       bandwidthHz: params.getBandwidth(),
-      squelch: params.getSquelch(),
       stereo: params.hasStereo() ? params.getStereo() : false,
     });
   }
@@ -242,13 +477,22 @@ export class RadioController {
   }
 
   setSquelch(level: number): void {
-    if (!this.demodulator) return;
-    const params = modeParameters(this.demodulator.getMode());
-    if (!params.hasSquelch()) return;
-    const next = params.setSquelch(level);
-    this.demodulator.setMode(next.mode);
-    this.knownModes[next.mode.scheme] = next.mode;
-    this.patch({ squelch: next.getSquelch() });
+    const squelch = clamp(Math.round(level), SQUELCH_MIN_DB, SQUELCH_MAX_DB);
+    this.patch({ squelch });
+    if (!this.squelchActive()) {
+      this.forceSquelchOpen();
+    }
+  }
+
+  setAutoSquelch(enabled: boolean): void {
+    this.patch({ autoSquelch: enabled });
+    this.squelchGate.reset();
+    if (!enabled && this.state.squelch <= 0) {
+      this.forceSquelchOpen();
+    } else if (enabled && this.state.squelch <= 0) {
+      // Give auto a usable default margin when the slider was off.
+      this.patch({ squelch: AUTO_SQUELCH_DEFAULT_MARGIN_DB });
+    }
   }
 
   setStereo(stereo: boolean): void {
@@ -280,8 +524,7 @@ export class RadioController {
     this.patch({ status: "starting", error: null, connection });
 
     const player = new TappingPlayer();
-    const wantTap = this.transcription.getState().enabled;
-    player.setTapping(wantTap);
+    player.setTapping(this.wantAudioTap());
     this.untap = player.onAudio(this.onTapAudio);
 
     const demodulator = new Demodulator({ player });
@@ -316,17 +559,37 @@ export class RadioController {
 
       demodulator.setVolume(this.state.volume);
       demodulator.setFrequencyOffset(this.state.offsetHz);
-      demodulator.setMode(this.knownModes[this.state.scheme] ?? getMode("WBFM"));
 
-      const params = modeParameters(demodulator.getMode());
+      const baseMode = this.knownModes[this.state.scheme] ?? getMode("WBFM");
+      let mode = baseMode;
+      const params = modeParameters(mode);
+      if (params.hasSquelch()) {
+        mode = params.setSquelch(0).mode;
+        this.knownModes[mode.scheme] = mode;
+      }
+      demodulator.setMode(mode);
+
+      this.squelchGate.reset();
+      this.lastSquelchEvalMs = 0;
+      this.player?.setSquelched(false);
+
       this.patch({
-        bandwidthHz: params.getBandwidth(),
-        squelch: params.getSquelch(),
-        stereo: params.hasStereo() ? params.getStereo() : false,
+        bandwidthHz: modeParameters(mode).getBandwidth(),
+        stereo: modeParameters(mode).hasStereo()
+          ? modeParameters(mode).getStereo()
+          : false,
+        squelchOpen: true,
       });
 
       await radio.start();
-      this.patch({ status: "playing" });
+      const actualRate = radio.getSampleRate();
+      const half = actualRate / 2;
+      this.patch({
+        sampleRate: actualRate,
+        offsetHz: clamp(this.state.offsetHz, -half, half),
+        status: "playing",
+      });
+      demodulator.setFrequencyOffset(this.state.offsetHz);
     } catch (err) {
       this.teardown();
       this.patch({
@@ -351,24 +614,94 @@ export class RadioController {
   }
 
   private emitSpectrum(): void {
-    if (!this.spectrum || this.spectrumListeners.size === 0) return;
+    if (!this.spectrum) return;
+    const scanning = this.signalId.getState().enabled;
+    const squelchOn = this.squelchActive();
+    if (this.spectrumListeners.size === 0 && !scanning && !squelchOn) return;
+
     this.spectrum.getSpectrum(this.spectrumBuffer);
     const center = this.spectrum.frequency();
+
+    if (squelchOn) {
+      this.evaluateSquelch();
+    }
+
+    if (scanning) {
+      this.signalId.pushSpectrum(
+        this.spectrumBuffer,
+        center,
+        this.state.sampleRate,
+        this.state.frequencyHz,
+      );
+    }
     for (const listener of this.spectrumListeners) {
       listener(this.spectrumBuffer, center);
     }
   }
 
+  private squelchActive(): boolean {
+    return this.state.autoSquelch || this.state.squelch > 0;
+  }
+
+  private forceSquelchOpen(): void {
+    this.squelchGate.reset();
+    this.player?.setSquelched(false);
+    if (!this.state.squelchOpen) {
+      this.patch({ squelchOpen: true });
+    }
+  }
+
+  private evaluateSquelch(): void {
+    const now = performance.now();
+    const dtSeconds =
+      this.lastSquelchEvalMs > 0
+        ? Math.min(0.5, (now - this.lastSquelchEvalMs) / 1000)
+        : 0.05;
+    this.lastSquelchEvalMs = now;
+
+    const decision = this.squelchGate.updateFromSpectrum(
+      this.spectrumBuffer,
+      this.state.sampleRate,
+      this.state.offsetHz,
+      this.state.bandwidthHz,
+      this.state.squelch,
+      this.state.autoSquelch,
+      dtSeconds,
+    );
+
+    this.player?.setSquelched(!decision.open);
+    if (decision.open !== this.state.squelchOpen) {
+      this.patch({ squelchOpen: decision.open });
+    }
+  }
+
   private teardown(): void {
+    this.signalId.reset();
+    this.squelchGate.reset();
+    this.lastSquelchEvalMs = 0;
     this.sampleCounter?.removeEventListener("sample-click", this.onSampleClick);
     this.untap?.();
     this.untap = null;
     this.player?.setTapping(false);
+    this.player?.setSquelched(false);
     this.player = null;
     this.radio = null;
     this.demodulator = null;
     this.spectrum = null;
     this.sampleCounter = null;
+  }
+
+  private wantAudioTap(): boolean {
+    return (
+      this.transcription.getState().enabled ||
+      this.fsk.getState().enabled ||
+      this.ft8.getState().enabled ||
+      this.morse.getState().enabled
+    );
+  }
+
+  private syncTapping(): void {
+    this.player?.setTapping(this.wantAudioTap());
   }
 
   private patch(partial: Partial<SdrState>): void {

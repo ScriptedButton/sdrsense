@@ -20,7 +20,7 @@ export function ConnectBar() {
   const showUsbWarning = mounted && !state.webUsbSupported;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="connect-bar">
       {!playing ? (
         <>
           <button
@@ -29,7 +29,7 @@ export function ConnectBar() {
             disabled={busy || !usbReady}
             onClick={() => void controller.connectDevice()}
           >
-            Connect RTL-SDR
+            Connect
           </button>
           <button
             type="button"
@@ -47,15 +47,15 @@ export function ConnectBar() {
           disabled={busy}
           onClick={() => void controller.stop()}
         >
-          Disconnect
+          Stop
         </button>
       )}
 
       <StatusPill state={state.status} connection={state.connection} />
 
       {showUsbWarning && (
-        <span className="text-sm text-warn">
-          WebUSB unavailable — use Chrome/Edge, or try Demo
+        <span className="connect-bar-warn">
+          No WebUSB — try Demo
         </span>
       )}
     </div>
@@ -84,22 +84,20 @@ function StatusPill({
 
   const tone =
     state === "playing"
-      ? "bg-accent/15 text-accent"
+      ? "status-pill-live"
       : state === "error"
-        ? "bg-danger/15 text-danger"
-        : "bg-surface-2 text-muted";
+        ? "status-pill-error"
+        : "status-pill-idle";
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${tone}`}
-    >
+    <span className={`status-pill ${tone}`}>
       <span
-        className={`size-1.5 rounded-full ${
+        className={`status-pill-dot ${
           state === "playing"
-            ? "bg-accent animate-pulse"
+            ? "status-pill-dot-live"
             : state === "error"
-              ? "bg-danger"
-              : "bg-muted"
+              ? "status-pill-dot-error"
+              : ""
         }`}
         aria-hidden
       />

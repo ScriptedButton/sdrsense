@@ -1,40 +1,39 @@
 "use client";
 
+import { ModeSchemeChips, SCHEME_LABELS } from "@/components/sdr/mode-scheme-chips";
 import { useRadioController, useSdrState } from "@/components/sdr/sdr-provider";
+import { SquelchControl } from "@/components/sdr/squelch-control";
 import type { DemodScheme } from "@/lib/sdr/types";
 
 const SCHEME_META: Record<
   DemodScheme,
-  { label: string; hasBw: boolean; hasSq: boolean; hasStereo: boolean }
+  { hasBw: boolean; hasStereo: boolean }
 > = {
-  WBFM: { label: "WBFM", hasBw: true, hasSq: false, hasStereo: true },
-  NBFM: { label: "NBFM", hasBw: true, hasSq: true, hasStereo: false },
-  AM: { label: "AM", hasBw: true, hasSq: true, hasStereo: false },
-  USB: { label: "USB", hasBw: true, hasSq: true, hasStereo: false },
-  LSB: { label: "LSB", hasBw: true, hasSq: true, hasStereo: false },
-  CW: { label: "CW", hasBw: true, hasSq: true, hasStereo: false },
+  WBFM: { hasBw: true, hasStereo: true },
+  NBFM: { hasBw: true, hasStereo: false },
+  AM: { hasBw: true, hasStereo: false },
+  USB: { hasBw: true, hasStereo: false },
+  LSB: { hasBw: true, hasStereo: false },
+  CW: { hasBw: true, hasStereo: false },
 };
 
-export function ModeControl() {
+type ModeControlProps = {
+  /** When false, scheme chips live in the primary toolbar instead. */
+  showSchemes?: boolean;
+};
+
+export function ModeControl({ showSchemes = true }: ModeControlProps) {
   const controller = useRadioController();
   const state = useSdrState();
   const meta = SCHEME_META[state.scheme];
 
   return (
     <fieldset className="control-group">
-      <legend className="control-label">Mode</legend>
-      <div className="flex flex-wrap gap-1">
-        {(Object.keys(SCHEME_META) as DemodScheme[]).map((scheme) => (
-          <button
-            key={scheme}
-            type="button"
-            className={`mode-chip ${state.scheme === scheme ? "mode-chip-active" : ""}`}
-            onClick={() => controller.setScheme(scheme)}
-          >
-            {SCHEME_META[scheme].label}
-          </button>
-        ))}
-      </div>
+      <legend className="control-label">
+        {showSchemes ? "Mode" : `Mode · ${SCHEME_LABELS[state.scheme]}`}
+      </legend>
+
+      {showSchemes && <ModeSchemeChips />}
 
       {meta.hasBw && (
         <label className="mt-3 block text-xs text-muted">
@@ -51,20 +50,7 @@ export function ModeControl() {
         </label>
       )}
 
-      {meta.hasSq && (
-        <label className="mt-2 block text-xs text-muted">
-          Squelch · {state.squelch}
-          <input
-            type="range"
-            className="slider mt-1"
-            min={0}
-            max={30}
-            step={1}
-            value={state.squelch}
-            onChange={(e) => controller.setSquelch(Number(e.target.value))}
-          />
-        </label>
-      )}
+      <SquelchControl />
 
       {meta.hasStereo && (
         <label className="mt-2 flex items-center gap-2 text-sm text-ink">

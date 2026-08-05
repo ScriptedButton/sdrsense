@@ -3,14 +3,36 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import { useSpectrumStream } from "@/components/sdr/sdr-provider";
-import { MIN_DB, MAX_DB } from "@/lib/sdr/types";
+import {
+  useSpectrumNav,
+  type SpectrumNavHandlers,
+} from "@/components/sdr/use-spectrum-nav";
+import {
+  drawSignalMarkers,
+  type SignalMarker,
+} from "@/lib/sdr/signal-id/scope-overlay";
+import {
+  axisTickStepHz,
+  formatAxisHz,
+  offsetHzToX,
+  type SpectrumViewport,
+  viewSpanHz,
+} from "@/lib/sdr/spectrum-viewport";
+import { dbRangeFor, type DbRangeId } from "@/lib/sdr/display-settings";
 
 type SpectrumScopeProps = {
   sampleRate: number;
   frequencyHz: number;
   offsetHz: number;
   bandwidthHz: number;
-  onTuneOffset?: (offsetHz: number) => void;
+  viewport: SpectrumViewport;
+  onViewportChange: (next: SpectrumViewport) => void;
+  onTuneOffset: (offsetHz: number) => void;
+  onCenterOnOffset: (offsetHz: number) => void;
+  onPanLo: (deltaHz: number) => void;
+  dbRange: DbRangeId;
+  /** Identified signals to annotate over the trace. */
+  markers?: SignalMarker[];
 };
 
 export function SpectrumScope({
@@ -18,36 +40,77 @@ export function SpectrumScope({
   frequencyHz,
   offsetHz,
   bandwidthHz,
+  viewport,
+  onViewportChange,
   onTuneOffset,
+  onCenterOnOffset,
+  onPanLo,
+  dbRange,
+  markers,
 }: SpectrumScopeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const latestRef = useRef<Float32Array | null>(null);
   const centerRef = useRef<number | undefined>(undefined);
   const rafRef = useRef<number>(0);
+  const dirtyRef = useRef(true);
+  const markersRef = useRef<SignalMarker[]>([]);
+  markersRef.current = markers ?? [];
+
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const dbRef = useRef(dbRangeFor(dbRange));
+  dbRef.current = dbRangeFor(dbRange);
+  const sampleRateRef = useRef(sampleRate);
+  sampleRateRef.current = sampleRate;
+  const frequencyRef = useRef(frequencyHz);
+  frequencyRef.current = frequencyHz;
+  const offsetRef = useRef(offsetHz);
+  offsetRef.current = offsetHz;
+  const bandwidthRef = useRef(bandwidthHz);
+  bandwidthRef.current = bandwidthHz;
+
+  // Props that affect the trace/overlays — mark dirty without reallocating draw.
+  useEffect(() => {
+    dirtyRef.current = true;
+  }, [bandwidthHz, frequencyHz, offsetHz, sampleRate, viewport, dbRange, markers]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const spectrum = latestRef.current;
     if (!canvas || !spectrum) return;
+    if (!dirtyRef.current) return;
+    dirtyRef.current = false;
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
     if (width === 0 || height === 0) return;
 
-    if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
+    const targetW = Math.floor(width * dpr);
+    const targetH = Math.floor(height * dpr);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
     }
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    const vp = viewportRef.current;
+    const { minDb, maxDb } = dbRef.current;
+    const rate = sampleRateRef.current;
+    const freq = frequencyRef.current;
+    const offset = offsetRef.current;
+    const bandwidth = bandwidthRef.current;
+    const span = viewSpanHz(rate, vp.zoom);
+    const toX = (off: number) => offsetHzToX(off, width, rate, vp);
+    const hzToPx = (hz: number) => (hz / span) * width;
+
     ctx.fillStyle = "oklch(0.08 0 0)";
     ctx.fillRect(0, 0, width, height);
 
-    // Grid
+    // Grid — horizontal always; vertical from frequency ticks
     ctx.strokeStyle = "oklch(0.22 0.01 355)";
     ctx.lineWidth = 1;
     for (let i = 1; i < 4; i++) {
@@ -57,30 +120,49 @@ export function SpectrumScope({
       ctx.lineTo(width, y);
       ctx.stroke();
     }
-    for (let i = 1; i < 8; i++) {
-      const x = (width * i) / 8;
+
+    const center = centerRef.current ?? freq;
+    const leftHz = center + vp.centerOffsetHz - span / 2;
+    const rightHz = leftHz + span;
+    const step = axisTickStepHz(span);
+    const firstTick = Math.ceil(leftHz / step) * step;
+
+    ctx.font = "11px var(--font-mono), ui-monospace, monospace";
+
+    for (let f = firstTick; f <= rightHz + 1; f += step) {
+      const x = toX(f - center);
+      ctx.strokeStyle = "oklch(0.22 0.01 355)";
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
+
+      const label = formatAxisHz(f);
+      const tw = ctx.measureText(label).width;
+      const lx = Math.min(Math.max(x - tw / 2, 4), width - tw - 4);
+      ctx.fillStyle = "oklch(0.62 0.02 355)";
+      ctx.fillText(label, lx, height - 6);
     }
 
     const n = spectrum.length;
     const half = n / 2;
-    const dbRange = MAX_DB - MIN_DB;
+    const dbSpan = maxDb - minDb;
 
     // Bandwidth highlight around offset
-    const bwPx = (bandwidthHz / sampleRate) * width;
-    const offsetPx = width / 2 + (offsetHz / sampleRate) * width;
+    const bwPx = hzToPx(bandwidth);
+    const offsetPx = toX(offset);
     ctx.fillStyle = "oklch(0.62 0.18 355 / 0.12)";
     ctx.fillRect(offsetPx - bwPx / 2, 0, bwPx, height);
 
-    // Center / tune markers
-    ctx.strokeStyle = "oklch(0.78 0.12 195 / 0.55)";
-    ctx.beginPath();
-    ctx.moveTo(width / 2, 0);
-    ctx.lineTo(width / 2, height);
-    ctx.stroke();
+    // LO center marker (only when visible)
+    const loX = toX(0);
+    if (loX >= -1 && loX <= width + 1) {
+      ctx.strokeStyle = "oklch(0.78 0.12 195 / 0.55)";
+      ctx.beginPath();
+      ctx.moveTo(loX, 0);
+      ctx.lineTo(loX, height);
+      ctx.stroke();
+    }
 
     ctx.strokeStyle = "oklch(0.70 0.20 355)";
     ctx.setLineDash([4, 4]);
@@ -90,19 +172,29 @@ export function SpectrumScope({
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Spectrum line
+    // Spectrum line — sample bins across the visible window
     ctx.beginPath();
     ctx.strokeStyle = "oklch(0.82 0.14 195)";
     ctx.lineWidth = 1.5;
     ctx.fillStyle = "oklch(0.78 0.12 195 / 0.18)";
 
-    for (let i = 0; i < n; i++) {
-      const bin = spectrum[(i + half) % n];
-      const db = Number.isFinite(bin) ? bin : MIN_DB;
-      const x = (i / (n - 1)) * width;
-      const y = height - ((db - MIN_DB) / dbRange) * height;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    const leftOffset = vp.centerOffsetHz - span / 2;
+    const denom = Math.max(width - 1, 1);
+    for (let px = 0; px < width; px++) {
+      const offsetAtX = leftOffset + (px / denom) * span;
+      const frac = offsetAtX / rate + 0.5;
+      const binFloat = frac * (n - 1);
+      const i0 = Math.floor(binFloat);
+      const i1 = Math.min(Math.max(i0, 0) + 1, n - 1);
+      const t = binFloat - i0;
+      // fftshift: display index i reads spectrum[(i + half) % n]
+      const shifted0 = spectrum[(((Math.max(i0, 0) % n) + n) % n + half) % n];
+      const shifted1 = spectrum[(i1 + half) % n];
+      const dbRaw = shifted0 * (1 - t) + shifted1 * t;
+      const db = Number.isFinite(dbRaw) ? dbRaw : minDb;
+      const y = height - ((db - minDb) / dbSpan) * height;
+      if (px === 0) ctx.moveTo(px, y);
+      else ctx.lineTo(px, y);
     }
     ctx.stroke();
     ctx.lineTo(width, height);
@@ -110,19 +202,18 @@ export function SpectrumScope({
     ctx.closePath();
     ctx.fill();
 
-    // Axis labels
     ctx.fillStyle = "oklch(0.62 0.02 355)";
-    ctx.font = "11px var(--font-mono), ui-monospace, monospace";
-    const center = centerRef.current ?? frequencyHz;
-    const leftHz = center - sampleRate / 2;
-    const rightHz = center + sampleRate / 2;
-    ctx.fillText(formatAxis(leftHz), 6, height - 6);
-    ctx.fillText(formatAxis(center), width / 2 - 28, height - 6);
-    const rightLabel = formatAxis(rightHz);
-    ctx.fillText(rightLabel, width - ctx.measureText(rightLabel).width - 6, height - 6);
-    ctx.fillText(`${MAX_DB} dB`, 6, 14);
-    ctx.fillText(`${MIN_DB} dB`, 6, height - 22);
-  }, [bandwidthHz, frequencyHz, offsetHz, sampleRate]);
+    ctx.fillText(`${maxDb} dB`, 6, 14);
+    ctx.fillText(`${minDb} dB`, 6, height - 22);
+
+    drawSignalMarkers(ctx, {
+      markers: markersRef.current,
+      width,
+      height,
+      offsetToX: toX,
+      hzToPx,
+    });
+  }, []);
 
   useEffect(() => {
     const loop = () => {
@@ -135,39 +226,41 @@ export function SpectrumScope({
 
   useSpectrumStream(
     useCallback((spectrum, centerHz) => {
-      latestRef.current = spectrum.slice();
+      if (!latestRef.current || latestRef.current.length !== spectrum.length) {
+        latestRef.current = new Float32Array(spectrum.length);
+      }
+      latestRef.current.set(spectrum);
       centerRef.current = centerHz;
+      dirtyRef.current = true;
     }, []),
   );
 
-  const handlePointer = (clientX: number) => {
-    if (!onTuneOffset || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const fraction = x / rect.width - 0.5;
-    onTuneOffset(Math.round(fraction * sampleRate));
+  const navHandlers: SpectrumNavHandlers = {
+    onTuneOffset,
+    onCenterOnOffset,
+    onPanLo,
+    viewport,
+    onViewportChange,
+    sampleRate,
+    frequencyHz,
+    offsetHz,
+    bandwidthHz,
   };
+
+  const nav = useSpectrumNav(canvasRef, navHandlers);
 
   return (
     <canvas
       ref={canvasRef}
-      className="h-full w-full cursor-crosshair touch-none"
+      className="h-full w-full touch-none"
+      style={{ cursor: nav.cursor }}
       role="img"
-      aria-label="RF spectrum scope"
-      onPointerDown={(e) => {
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        handlePointer(e.clientX);
-      }}
-      onPointerMove={(e) => {
-        if (e.buttons !== 1) return;
-        handlePointer(e.clientX);
-      }}
+      aria-label="RF spectrum scope. Click to tune, drag to pan, scroll to zoom, double-click to center."
+      onPointerDown={nav.onPointerDown}
+      onPointerMove={nav.onPointerMove}
+      onPointerUp={nav.onPointerUp}
+      onPointerCancel={nav.onPointerUp}
+      onDoubleClick={nav.onDoubleClick}
     />
   );
-}
-
-function formatAxis(hz: number): string {
-  if (Math.abs(hz) >= 1e6) return `${(hz / 1e6).toFixed(3)} M`;
-  if (Math.abs(hz) >= 1e3) return `${(hz / 1e3).toFixed(1)} k`;
-  return `${Math.round(hz)}`;
 }

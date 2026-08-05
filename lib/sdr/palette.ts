@@ -1,4 +1,4 @@
-/** CubeHelix palette for waterfall intensity (Green 2011). */
+/** Color palettes for waterfall / spectrometer intensity. */
 export type Rgb = [number, number, number];
 
 export function cubeHelix(
@@ -22,6 +22,30 @@ export function cubeHelix(
       Math.floor(Math.max(0, Math.min(255, 256 * r))),
       Math.floor(Math.max(0, Math.min(255, 256 * gr))),
       Math.floor(Math.max(0, Math.min(255, 256 * b))),
+    ];
+  }
+  return palette;
+}
+
+/** Interpolate a short list of stop colors into a 256-entry LUT. */
+export function makeGradientPalette(stops: Rgb[]): Rgb[] {
+  if (stops.length === 0) return cubeHelix();
+  if (stops.length === 1) return new Array(256).fill(stops[0]);
+
+  const palette: Rgb[] = new Array(256);
+  const last = stops.length - 1;
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    const pos = t * last;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, last);
+    const f = pos - i0;
+    const a = stops[i0];
+    const b = stops[i1];
+    palette[i] = [
+      Math.round(a[0] + (b[0] - a[0]) * f),
+      Math.round(a[1] + (b[1] - a[1]) * f),
+      Math.round(a[2] + (b[2] - a[2]) * f),
     ];
   }
   return palette;
