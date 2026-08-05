@@ -22,6 +22,9 @@ import {
   DEFAULT_P25_CONFIG,
   DEFAULT_P25_SYSTEM,
 } from "@/lib/sdr/p25/types";
+import type { ScannerState } from "@/lib/sdr/scanner/types";
+import { DEFAULT_SCANNER_CONFIG } from "@/lib/sdr/scanner/types";
+import { createDefaultBanks } from "@/lib/sdr/scanner/banks";
 import type { SignalIdState } from "@/lib/sdr/signal-id/types";
 import type { TranscriptionState } from "@/lib/sdr/transcription-engine";
 import type { WefaxState } from "@/lib/sdr/wefax/types";
@@ -242,6 +245,29 @@ export function useP25State(): P25State {
       }),
     () => controller.getP25State(),
     () => SERVER_P25,
+  );
+}
+
+const SERVER_SCANNER: ScannerState = {
+  status: "idle",
+  config: DEFAULT_SCANNER_CONFIG,
+  banks: createDefaultBanks(),
+  scanIndex: 0,
+  currentChannelId: null,
+  holdReason: null,
+  hopCount: 0,
+  error: null,
+};
+
+export function useScannerState(): ScannerState {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) =>
+      controller.subscribeScanner(() => {
+        onStoreChange();
+      }),
+    () => controller.getScannerState(),
+    () => SERVER_SCANNER,
   );
 }
 

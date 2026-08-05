@@ -11,6 +11,7 @@ import {
   type CallsignLookupSeed,
 } from "@/components/sdr/callsign/callsign-lookup-panel";
 import { FrequencyControl } from "@/components/sdr/frequency-control";
+import { FreqLookupPanel } from "@/components/sdr/freq-lookup/freq-lookup-panel";
 import { FskPanel } from "@/components/sdr/fsk/fsk-panel";
 import { Ft8Panel } from "@/components/sdr/ft8/ft8-panel";
 import { GmrsChannelPresets } from "@/components/sdr/gmrs-channel-presets";
@@ -19,11 +20,13 @@ import { MorsePanel } from "@/components/sdr/morse/morse-panel";
 import { P25Panel } from "@/components/sdr/p25/p25-panel";
 import { RailTabs } from "@/components/sdr/rail-tabs";
 import { SampleRateControl } from "@/components/sdr/sample-rate-control";
+import { ScannerPanel } from "@/components/sdr/scanner/scanner-panel";
 import {
   useFskState,
   useFt8State,
   useMorseState,
   useP25State,
+  useScannerState,
   useSdrState,
   useSignalIdState,
   useTranscriptionState,
@@ -45,7 +48,7 @@ type ControlRailProps = {
 
 type MainTab = "radio" | "decode" | "identify";
 type DecodeTab = "morse" | "fsk" | "ft8" | "wefax" | "trunk" | "speech";
-type IdentifyTab = "signals" | "callsign";
+type IdentifyTab = "signals" | "frequency" | "callsign";
 
 /**
  * Tabbed side rail: Radio (daily tune/audio), Decode (progressive), Identify.
@@ -65,6 +68,7 @@ export function ControlRail({
   const p25 = useP25State();
   const tx = useTranscriptionState();
   const scan = useSignalIdState();
+  const scanner = useScannerState();
 
   const [mainTab, setMainTab] = useState<MainTab>("radio");
   const [decodeTab, setDecodeTab] = useState<DecodeTab>("morse");
@@ -80,6 +84,11 @@ export function ControlRail({
     wefax.enabled ||
     p25.enabled ||
     tx.enabled;
+
+  const scannerActive =
+    scanner.status === "scanning" ||
+    scanner.status === "held" ||
+    scanner.status === "paused";
 
   const callsignNav = useMemo(
     () => ({
@@ -101,7 +110,7 @@ export function ControlRail({
           value={mainTab}
           onChange={setMainTab}
           tabs={[
-            { id: "radio", label: "Radio" },
+            { id: "radio", label: "Radio", badge: scannerActive },
             {
               id: "decode",
               label: "Decode",
@@ -134,6 +143,7 @@ export function ControlRail({
               <SampleRateControl />
               <AudioGainControl />
               <GmrsChannelPresets />
+              <ScannerPanel />
               <ShortwaveExplorer />
               <HelpCard supported={state.webUsbSupported} />
             </div>
@@ -192,10 +202,12 @@ export function ControlRail({
                     badge:
                       scan.signals.length > 0 ? scan.signals.length : false,
                   },
+                  { id: "frequency", label: "Frequency" },
                   { id: "callsign", label: "Callsign" },
                 ]}
               />
               {identifyTab === "signals" && <SignalIdPanel />}
+              {identifyTab === "frequency" && <FreqLookupPanel />}
               {identifyTab === "callsign" && (
                 <CallsignLookupPanel seed={lookupSeed} />
               )}

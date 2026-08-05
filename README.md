@@ -26,6 +26,8 @@ Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick
 - Frequency, offset, gain (AGC/manual), volume, bandwidth, squelch / auto-squelch
 - Band presets and demo mode with simulated signals
 - GMRS channel presets (1–22 + repeater inputs) and GMRS callsign lookup (FCC via Skywave)
+- Programmable memory scanner — bank hop (GMRS, NOAA WX, VHF/UHF, FM, Custom), dwell / hold, stop on squelch, lockouts, add dial to Custom
+- Frequency lookup — reverse ID for the dial via GMRS channels, band plan, SigID catalog, and EiBi shortwave
 - Shortwave explorer — EiBi HF broadcast schedule; filter by on-air / band / language; one-tap AM tune
 - Live transcription of demodulated audio (Whisper tiny.en, in-browser)
 - Morse / CW decoder on demod audio — tone or envelope detection, fixed or auto WPM, with keyword / Q-code / callsign identification

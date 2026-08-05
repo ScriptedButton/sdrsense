@@ -53,6 +53,13 @@ import type {
   P25Listener,
   P25State,
 } from "./p25/types";
+import { ScannerEngine } from "./scanner/engine";
+import type {
+  ScanChannel,
+  ScannerConfig,
+  ScannerListener,
+  ScannerState,
+} from "./scanner/types";
 import { createDemoWefaxBank } from "./wefax/demo-signal";
 import { WefaxDecoderEngine } from "./wefax/engine";
 import type {
@@ -147,6 +154,7 @@ export class RadioController {
   private readonly wefax = new WefaxDecoderEngine();
   private readonly p25 = new P25DecoderEngine();
   private readonly p25Iq = new P25IqReceiver();
+  private readonly scanner = new ScannerEngine();
   private readonly signalId = new SignalIdEngine();
   private readonly squelchGate = new SquelchGate();
   private spectrumBuffer = new Float32Array(FFT_SIZE);
@@ -355,6 +363,81 @@ export class RadioController {
     }
   }
 
+  getScannerState(): ScannerState {
+    return this.scanner.getState();
+  }
+
+  subscribeScanner(listener: ScannerListener): () => void {
+    return this.scanner.subscribe(listener);
+  }
+
+  async startScanner(): Promise<void> {
+    this.bindScannerHooks();
+    await this.scanner.start();
+  }
+
+  stopScanner(): void {
+    this.scanner.stop();
+  }
+
+  pauseScanner(): void {
+    this.scanner.pause();
+  }
+
+  resumeScanner(): void {
+    this.bindScannerHooks();
+    this.scanner.resume();
+  }
+
+  async skipScanner(): Promise<void> {
+    this.bindScannerHooks();
+    await this.scanner.skip();
+  }
+
+  holdScanner(): void {
+    this.scanner.hold();
+  }
+
+  patchScannerConfig(partial: Partial<ScannerConfig>): void {
+    this.scanner.patchConfig(partial);
+  }
+
+  setScannerBank(bankId: string): void {
+    this.scanner.setActiveBank(bankId);
+  }
+
+  toggleScannerLockout(channelId: string): void {
+    this.scanner.toggleLockout(channelId);
+  }
+
+  addScannerChannel(input: {
+    label: string;
+    frequencyHz: number;
+    scheme: DemodScheme;
+    bandwidthHz?: number;
+    bankId?: string;
+  }): ScanChannel | null {
+    return this.scanner.addChannel(input);
+  }
+
+  removeScannerChannel(channelId: string): void {
+    this.scanner.removeChannel(channelId);
+  }
+
+  resetScannerBanks(): void {
+    this.scanner.resetBuiltinBanks();
+  }
+
+  /** Tune to a memory channel without starting a scan. */
+  async tuneScannerChannel(channel: ScanChannel): Promise<void> {
+    this.setScheme(channel.scheme);
+    if (channel.bandwidthHz != null) {
+      this.setBandwidth(channel.bandwidthHz);
+    }
+    this.setOffset(0);
+    await this.setFrequency(channel.frequencyHz);
+  }
+
   patchP25Config(partial: Partial<P25Config>): void {
     this.p25.patchConfig(partial);
   }
@@ -415,6 +498,7 @@ export class RadioController {
 
   async stop(): Promise<void> {
     if (!this.radio) return;
+    this.scanner.stop();
     this.patch({ status: "stopping", error: null });
     try {
       await this.radio.stop();
@@ -817,6 +901,18 @@ export class RadioController {
       setDigitalMute: (muted) => this.setDigitalMute(muted),
       getFrequency: () => this.state.frequencyHz,
       getOffset: () => this.state.offsetHz,
+    });
+  }
+
+  private bindScannerHooks(): void {
+    this.scanner.setRadioHooks({
+      setFrequency: (hz) => this.setFrequency(hz),
+      setScheme: (scheme) => this.setScheme(scheme),
+      setBandwidth: (hz) => this.setBandwidth(hz),
+      setOffset: (hz) => this.setOffset(hz),
+      getSquelchOpen: () => this.state.squelchOpen,
+      getSquelchActive: () => this.squelchActive(),
+      isConnected: () => this.state.connection !== "disconnected",
     });
   }
 

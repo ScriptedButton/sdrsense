@@ -1565,6 +1565,263 @@ body {
   padding: 0.75rem 0.5rem;
 }
 
+/* --- Memory scanner --- */
+
+.scanner-select,
+.scanner-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-family: inherit;
+}
+
+.scanner-select:focus-visible,
+.scanner-input:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.scanner-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.65rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.scanner-check input {
+  accent-color: var(--primary);
+}
+
+.scanner-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid color-mix(in oklch, var(--line) 70%, transparent);
+  border-radius: 0.35rem;
+}
+
+.scanner-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid color-mix(in oklch, var(--line) 70%, transparent);
+  transition: background 150ms var(--ease-out);
+}
+
+.scanner-row:last-child {
+  border-bottom: none;
+}
+
+.scanner-row:hover {
+  background: var(--surface-2);
+}
+
+.scanner-row-active {
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+
+.scanner-row-locked {
+  opacity: 0.45;
+}
+
+.scanner-row-tune {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 4.2rem 1fr;
+  gap: 0.35rem;
+  align-items: start;
+  min-width: 0;
+  padding: 0.35rem 0.45rem;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scanner-row-tune:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
+.scanner-row-freq {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  line-height: 1.25;
+  padding-top: 0.1rem;
+}
+
+.scanner-row-unit {
+  color: var(--muted);
+  font-size: 0.55rem;
+}
+
+.scanner-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.scanner-row-name {
+  font-size: 0.7rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scanner-row-meta {
+  font-size: 0.55rem;
+  color: var(--muted);
+}
+
+.scanner-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding-right: 0.25rem;
+  flex-shrink: 0;
+}
+
+.scanner-icon-btn {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scanner-icon-btn:hover {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.scanner-icon-btn:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+}
+
+.scanner-icon-btn[aria-pressed="true"] {
+  color: var(--warn);
+}
+
+.scanner-add {
+  border-top: 1px solid color-mix(in oklch, var(--line) 70%, transparent);
+}
+
+/* --- Frequency lookup --- */
+
+.freq-lookup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.freq-lookup-list > li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem;
+  align-items: center;
+  border-bottom: 1px solid color-mix(in oklch, var(--line) 70%, transparent);
+}
+
+.freq-lookup-list > li:last-child {
+  border-bottom: none;
+}
+
+.freq-lookup-row {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr auto;
+  gap: 0.4rem;
+  align-items: start;
+  width: 100%;
+  padding: 0.4rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms var(--ease-out);
+}
+
+.freq-lookup-row:hover {
+  background: var(--surface-2);
+}
+
+.freq-lookup-row:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
+.freq-lookup-row-live {
+  background: color-mix(in oklch, var(--accent) 8%, transparent);
+}
+
+.freq-lookup-source {
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 0.15rem;
+}
+
+.freq-lookup-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.freq-lookup-name {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.freq-lookup-detail {
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.freq-lookup-scheme {
+  font-size: 0.55rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  padding-top: 0.15rem;
+}
+
+.freq-lookup-link {
+  font-size: 0.55rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 0.25rem 0.4rem;
+  border-radius: 0.25rem;
+}
+
+.freq-lookup-link:hover {
+  text-decoration: underline;
+  background: var(--surface-2);
+}
+
 @keyframes wefax-pulse {
   0%,
   100% {
