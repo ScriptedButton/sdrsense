@@ -55,6 +55,7 @@ function sourceLabel(
 ): string | null {
   if (connection === "demo") return "Simulated stick";
   if (connection === "device") return "RTL-SDR WebUSB";
+  if (connection === "rtltcp") return "RTL server (IQ)";
   if (connection === "openwebrx") {
     return receiverName ? `OpenWebRX+ · ${receiverName}` : "OpenWebRX+";
   }

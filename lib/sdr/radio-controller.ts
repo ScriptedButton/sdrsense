@@ -29,6 +29,11 @@ import {
   openWebRxMixedContentMessage,
   openWebRxWebSocketUrl,
 } from "./openwebrx/url";
+import { RtlTcpDeviceProvider } from "./rtl-tcp/device";
+import {
+  rtlServerMixedContentMessage,
+  rtlServerWebSocketUrl,
+} from "./rtl-tcp/url";
 import { createDemoFskGenerator } from "./fsk/demo-signal";
 import {
   FskDecoderEngine,
@@ -512,6 +517,31 @@ export class RadioController {
   async connectDemo(): Promise<void> {
     const fake = new FakeRtlDeviceProvider(createDemoGenerator());
     await this.startWithProvider(new RtlProvider(fake), "demo");
+  }
+
+  /**
+   * Connect to an RTL server (WebSocket bridge → rtl_tcp). Streams raw IQ so
+   * demodulation and P25 run in the browser, same as WebUSB.
+   */
+  async connectRtlServer(address: string): Promise<void> {
+    let wsUrl: string;
+    try {
+      wsUrl = rtlServerWebSocketUrl(address);
+    } catch (err) {
+      this.patch({
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    const mixed = rtlServerMixedContentMessage(wsUrl);
+    if (mixed) {
+      this.patch({ status: "error", error: mixed });
+      return;
+    }
+
+    const provider = new RtlTcpDeviceProvider(wsUrl);
+    await this.startWithProvider(new RtlProvider(provider), "rtltcp");
   }
 
   /**

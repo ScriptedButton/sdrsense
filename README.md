@@ -16,12 +16,29 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick, **OpenWebRX+** for a local server, or **Demo** to explore without hardware.
+Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick, **RTL server** for remote IQ, **OpenWebRX+** for a remote demod server, or **Demo** to explore without hardware.
+
+## Raspberry Pi / RTL server
+
+Stream raw IQ from a stick on another machine (e.g. a Raspberry Pi) so spectrum, demod, and P25 all run in the browser — same as WebUSB.
+
+On the host with the stick:
+
+```bash
+# install librtlsdr / rtl-sdr tools for your OS, then:
+rtl_tcp -a 127.0.0.1 -p 1234
+pnpm install
+pnpm rtl-server
+# optional: pnpm rtl-server -- --listen 8081 --tcp 127.0.0.1:1234
+```
+
+In SDRSense, click **RTL server**, enter `http://<pi-ip>:8081`, and connect. Expect ~16 Mbps on the LAN at 1.024 Msps (prefer wired Ethernet at higher rates). If SDRSense is served over HTTPS, use `wss://` (or open the app on `http://localhost`).
 
 ## Features
 
 - WebUSB connect to RTL-SDR
-- OpenWebRX+ client — tune a local server (`localhost:8073` by default). Spectrum and demodulated audio come from the server; Morse, FT8, fax, and the other audio decoders run on that audio. P25 still needs a local stick because it reads IQ.
+- RTL server — WebSocket bridge to `rtl_tcp` (default `localhost:8081`). Full-rate IQ over the network; demod and P25 run in the browser
+- OpenWebRX+ client — tune a local server (`localhost:8073` by default). Spectrum and demodulated audio come from the server; Morse, FT8, fax, and the other audio decoders run on that audio. P25 still needs local IQ (WebUSB or RTL server)
 - Live spectrum scope + waterfall
 - Demodulation: WBFM, NBFM, AM, USB, LSB, CW
 - Frequency, offset, gain (AGC/manual), volume, bandwidth, squelch / auto-squelch

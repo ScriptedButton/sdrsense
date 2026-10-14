@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useRadioController, useSdrState } from "@/components/sdr/sdr-provider";
 import { OpenWebRxConnect } from "@/components/sdr/openwebrx/openwebrx-connect";
+import { RtlTcpConnect } from "@/components/sdr/rtl-tcp/rtl-tcp-connect";
 import type { ConnectionMode, RadioStatus } from "@/lib/sdr/types";
 
 export function ConnectBar() {
@@ -33,6 +34,7 @@ export function ConnectBar() {
           >
             Connect
           </button>
+          <RtlTcpConnect align="end" />
           <OpenWebRxConnect align="end" />
           <button
             type="button"
@@ -81,7 +83,9 @@ function StatusPill({
         ? "Demo live"
         : connection === "openwebrx"
           ? "OpenWebRX"
-          : "Receiving"
+          : connection === "rtltcp"
+            ? "RTL server"
+            : "Receiving"
       : state === "starting"
         ? "Starting…"
         : state === "stopping"

@@ -74,6 +74,6 @@ function emptyMessage(enabled: boolean, live: boolean): string {
   if (!enabled) {
     return "Start a scan to detect every active signal in the tuned window and identify how each one is modulated.";
   }
-  if (!live) return "Waiting for RF — connect a stick, OpenWebRX+, or start Demo.";
+  if (!live) return "Waiting for RF — connect a stick, RTL server, OpenWebRX+, or start Demo.";
   return "Listening… nothing above the noise floor yet. Try raising sensitivity.";
 }
