@@ -16,11 +16,12 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick or use **Demo** to explore without hardware.
+Open [http://localhost:3000](http://localhost:3000), then **Connect** your stick, **OpenWebRX+** for a local server, or **Demo** to explore without hardware.
 
 ## Features
 
 - WebUSB connect to RTL-SDR
+- OpenWebRX+ client — tune a local server (`localhost:8073` by default). Spectrum and demodulated audio come from the server; Morse, FT8, fax, and the other audio decoders run on that audio. P25 still needs a local stick because it reads IQ.
 - Live spectrum scope + waterfall
 - Demodulation: WBFM, NBFM, AM, USB, LSB, CW
 - Frequency, offset, gain (AGC/manual), volume, bandwidth, squelch / auto-squelch

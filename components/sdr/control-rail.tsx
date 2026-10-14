@@ -227,6 +227,7 @@ function HelpCard({ supported }: { supported: boolean }) {
         <li>Chrome, Edge, or Opera on desktop/Android</li>
         <li>Serve over HTTPS or localhost</li>
         <li>RTL-SDR v4 (R828D) or other RTL2832U sticks</li>
+        <li>Or a local OpenWebRX+ server, usually localhost:8073</li>
         {!supported && (
           <li className="text-warn">
             This browser has no WebUSB — Demo still works

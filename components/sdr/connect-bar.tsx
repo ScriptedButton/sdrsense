@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 
 import { useRadioController, useSdrState } from "@/components/sdr/sdr-provider";
+import { OpenWebRxConnect } from "@/components/sdr/openwebrx/openwebrx-connect";
+import type { ConnectionMode, RadioStatus } from "@/lib/sdr/types";
 
 export function ConnectBar() {
   const controller = useRadioController();
@@ -31,6 +33,7 @@ export function ConnectBar() {
           >
             Connect
           </button>
+          <OpenWebRxConnect align="end" />
           <button
             type="button"
             className="btn-secondary"
@@ -41,14 +44,17 @@ export function ConnectBar() {
           </button>
         </>
       ) : (
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={busy}
-          onClick={() => void controller.stop()}
-        >
-          Stop
-        </button>
+        <>
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={busy}
+            onClick={() => void controller.stop()}
+          >
+            Stop
+          </button>
+          <OpenWebRxConnect align="end" />
+        </>
       )}
 
       <StatusPill state={state.status} connection={state.connection} />
@@ -66,14 +72,16 @@ function StatusPill({
   state,
   connection,
 }: {
-  state: string;
-  connection: string;
+  state: RadioStatus;
+  connection: ConnectionMode;
 }) {
   const label =
     state === "playing"
       ? connection === "demo"
         ? "Demo live"
-        : "Receiving"
+        : connection === "openwebrx"
+          ? "OpenWebRX"
+          : "Receiving"
       : state === "starting"
         ? "Starting…"
         : state === "stopping"

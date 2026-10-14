@@ -1,11 +1,14 @@
 "use client";
 
-import { useSdrState } from "@/components/sdr/sdr-provider";
+import { useOpenWebRxSession, useSdrState } from "@/components/sdr/sdr-provider";
 import { formatFrequency } from "@/lib/sdr/format";
+import type { ConnectionMode } from "@/lib/sdr/types";
 
 export function StatusBar() {
   const state = useSdrState();
+  const session = useOpenWebRxSession();
   const live = state.status === "playing";
+  const source = sourceLabel(state.connection, session?.receiverName ?? null);
 
   return (
     <footer className="status-bar">
@@ -41,11 +44,19 @@ export function StatusBar() {
           Sq {state.squelchOpen ? "open" : "closed"}
         </span>
       )}
-      {state.connection !== "disconnected" && (
-        <span className="text-accent">
-          {state.connection === "demo" ? "Simulated stick" : "RTL-SDR WebUSB"}
-        </span>
-      )}
+      {source && <span className="text-accent">{source}</span>}
     </footer>
   );
+}
+
+function sourceLabel(
+  connection: ConnectionMode,
+  receiverName: string | null,
+): string | null {
+  if (connection === "demo") return "Simulated stick";
+  if (connection === "device") return "RTL-SDR WebUSB";
+  if (connection === "openwebrx") {
+    return receiverName ? `OpenWebRX+ · ${receiverName}` : "OpenWebRX+";
+  }
+  return null;
 }

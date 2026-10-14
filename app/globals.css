@@ -615,6 +615,56 @@ body {
   text-align: right;
 }
 
+.owrx-form {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.owrx-form-end {
+  justify-content: flex-end;
+}
+
+.owrx-form-center {
+  justify-content: center;
+}
+
+.owrx-url-label {
+  flex: 1 1 14rem;
+  max-width: 22rem;
+}
+
+.owrx-url,
+.owrx-profile {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+}
+
+.owrx-profile {
+  width: auto;
+  max-width: 16rem;
+  cursor: pointer;
+}
+
+.owrx-url:focus-visible,
+.owrx-profile:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.owrx-profile-label {
+  display: inline-flex;
+}
+
 @media (min-width: 640px) {
   .connect-bar-warn {
     width: auto;

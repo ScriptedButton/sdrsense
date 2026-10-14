@@ -1,4 +1,4 @@
-export type ConnectionMode = "disconnected" | "device" | "demo";
+export type ConnectionMode = "disconnected" | "device" | "demo" | "openwebrx";
 
 export type RadioStatus =
   | "idle"

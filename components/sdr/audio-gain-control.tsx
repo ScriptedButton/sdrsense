@@ -5,6 +5,7 @@ import { useRadioController, useSdrState } from "@/components/sdr/sdr-provider";
 export function AudioGainControl() {
   const controller = useRadioController();
   const state = useSdrState();
+  const remote = state.connection === "openwebrx";
 
   return (
     <fieldset className="control-group">
@@ -26,6 +27,7 @@ export function AudioGainControl() {
         <input
           type="checkbox"
           checked={state.autoGain}
+          disabled={remote}
           onChange={(e) => void controller.setAutoGain(e.target.checked)}
         />
         Automatic gain
@@ -39,7 +41,7 @@ export function AudioGainControl() {
           min={0}
           max={50}
           step={0.5}
-          disabled={state.autoGain}
+          disabled={remote || state.autoGain}
           value={state.gainDb}
           onChange={(e) => void controller.setGain(Number(e.target.value))}
         />
@@ -53,6 +55,7 @@ export function AudioGainControl() {
           min={-100}
           max={100}
           step={1}
+          disabled={remote}
           value={state.ppm}
           onChange={(e) => void controller.setPpm(Number(e.target.value))}
         />
@@ -62,10 +65,17 @@ export function AudioGainControl() {
         <input
           type="checkbox"
           checked={state.biasTee}
+          disabled={remote}
           onChange={(e) => void controller.setBiasTee(e.target.checked)}
         />
         Bias-T
       </label>
+      {remote && (
+        <p className="mt-2 text-[0.7rem] leading-snug text-muted">
+          Gain, PPM, and bias tee are set on the OpenWebRX+ server. Volume and
+          squelch still apply here.
+        </p>
+      )}
     </fieldset>
   );
 }

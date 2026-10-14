@@ -28,6 +28,7 @@ import { createDefaultBanks } from "@/lib/sdr/scanner/banks";
 import type { SignalIdState } from "@/lib/sdr/signal-id/types";
 import type { TranscriptionState } from "@/lib/sdr/transcription-engine";
 import type { WefaxState } from "@/lib/sdr/wefax/types";
+import type { OpenWebRxSession } from "@/lib/sdr/openwebrx/protocol";
 import {
   DEFAULT_WEFAX_CONFIG,
   wefaxLineWidth,
@@ -288,5 +289,16 @@ export function useSignalIdState(): SignalIdState {
       }),
     () => controller.getSignalIdState(),
     () => SERVER_SIGNAL_ID,
+  );
+}
+
+const SERVER_OWRX: OpenWebRxSession | null = null;
+
+export function useOpenWebRxSession(): OpenWebRxSession | null {
+  const controller = useRadioController();
+  return useSyncExternalStore(
+    (onStoreChange) => controller.subscribeOpenWebRx(onStoreChange),
+    () => controller.getOpenWebRxSession(),
+    () => SERVER_OWRX,
   );
 }

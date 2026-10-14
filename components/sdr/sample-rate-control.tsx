@@ -7,6 +7,22 @@ export function SampleRateControl() {
   const controller = useRadioController();
   const state = useSdrState();
   const busy = state.status === "starting" || state.status === "stopping";
+  const remote = state.connection === "openwebrx";
+
+  if (remote) {
+    return (
+      <fieldset className="control-group">
+        <legend className="control-label">Spectrum width</legend>
+        <p className="text-[0.7rem] leading-snug text-muted">
+          Set by the OpenWebRX+ profile ·{" "}
+          <span className="font-mono text-ink">
+            {(state.sampleRate / 1e6).toFixed(3)} MHz
+          </span>
+          . Switch profile to change the window.
+        </p>
+      </fieldset>
+    );
+  }
 
   return (
     <fieldset className="control-group">

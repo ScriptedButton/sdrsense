@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/sdr/app-header";
 import { ControlRail } from "@/components/sdr/control-rail";
 import { DisplayModeToggle } from "@/components/sdr/display-mode-toggle";
 import { NoiseFilterControl } from "@/components/sdr/noise-filter-control";
+import { OpenWebRxConnect } from "@/components/sdr/openwebrx/openwebrx-connect";
 import { PrimaryToolbar } from "@/components/sdr/primary-toolbar";
 import {
   useRadioController,
@@ -260,7 +261,7 @@ function ScopeLayout({
         ) : (
           <EmptyDisplay
             title="Waiting for RF"
-            body="Connect an RTL-SDR stick or start Demo to see the spectrum."
+            body="Connect an RTL-SDR stick, an OpenWebRX+ server, or start Demo to see the spectrum."
             showConnect
           />
         )}
@@ -368,7 +369,7 @@ function SpectrometerLayout({
       ) : (
         <EmptyDisplay
           title="Waiting for RF"
-          body="Connect an RTL-SDR stick or start Demo to explore the 3D spectrometer."
+          body="Connect an RTL-SDR stick, an OpenWebRX+ server, or start Demo to explore the 3D spectrometer."
           showConnect
         />
       )}
@@ -410,6 +411,7 @@ function EmptyDisplay({
           >
             Connect RTL-SDR
           </button>
+          <OpenWebRxConnect align="center" />
           <button
             type="button"
             className="btn-secondary"

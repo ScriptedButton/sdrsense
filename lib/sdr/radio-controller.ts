@@ -20,6 +20,15 @@ import { Radio, RtlProvider } from "@jtarrio/webrtlsdr/radio.js";
 import { DirectSampling } from "@jtarrio/webrtlsdr/rtlsdr.js";
 
 import { clamp } from "./format";
+import { OpenWebRxClient } from "./openwebrx/client";
+import { owrxBandpass, owrxModulation, schemeFromOwrx } from "./openwebrx/modes";
+import { OpenWebRxPlayback } from "./openwebrx/playback";
+import type { OpenWebRxSession } from "./openwebrx/protocol";
+import { unshiftSpectrum } from "./openwebrx/spectrum";
+import {
+  openWebRxMixedContentMessage,
+  openWebRxWebSocketUrl,
+} from "./openwebrx/url";
 import { createDemoFskGenerator } from "./fsk/demo-signal";
 import {
   FskDecoderEngine,
@@ -163,6 +172,15 @@ export class RadioController {
   private spectrumListeners = new Set<SpectrumListener>();
   private lastSquelchEvalMs = 0;
   private digitalMute = false;
+  private owrx: OpenWebRxClient | null = null;
+  private owrxPlayback: OpenWebRxPlayback | null = null;
+  private owrxUntap: (() => void) | null = null;
+  private owrxSession: OpenWebRxSession | null = null;
+  private owrxListeners = new Set<() => void>();
+  private owrxSpectrum = new Float32Array(0);
+  private owrxExpectedClose = false;
+  private owrxLastHdMs = 0;
+  private sessionEpoch = 0;
   private onSampleClick = () => this.emitSpectrum();
   private onTapAudio = (mono: Float32Array, sampleRate: number) => {
     this.transcription.pushAudio(mono, sampleRate);
@@ -496,9 +514,144 @@ export class RadioController {
     await this.startWithProvider(new RtlProvider(fake), "demo");
   }
 
+  /**
+   * Connect to an OpenWebRX+ server. The server owns the radio and demodulator;
+   * this app tunes it and renders the waterfall and audio it streams back.
+   */
+  async connectOpenWebRx(address: string): Promise<void> {
+    let wsUrl: string;
+    try {
+      wsUrl = openWebRxWebSocketUrl(address);
+    } catch (err) {
+      this.patch({
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    const mixed = openWebRxMixedContentMessage(wsUrl);
+    if (mixed) {
+      this.patch({ status: "error", error: mixed });
+      return;
+    }
+
+    const playback = new OpenWebRxPlayback();
+    playback.unlock();
+    playback.setVolume(this.state.volume);
+    playback.setTapping(this.wantAudioTap());
+
+    await this.stop();
+    const epoch = this.sessionEpoch;
+    this.owrxExpectedClose = false;
+    this.owrxLastHdMs = 0;
+    this.owrxPlayback = playback;
+    this.owrxUntap = playback.onAudio(this.onTapAudio);
+    this.setOwrxSession({
+      url: address.trim(),
+      receiverName: null,
+      profiles: [],
+      profileId: null,
+      allowsCenterChanges: false,
+    });
+
+    for (const scheme of getSchemes()) {
+      this.knownModes[scheme] = getMode(scheme);
+    }
+
+    const client = new OpenWebRxClient({
+      onSpectrum: (shifted, centerHz, sampleRate) => {
+        if (epoch !== this.sessionEpoch) return;
+        this.onOpenWebRxSpectrum(shifted, centerHz, sampleRate);
+      },
+      onAudio: (pcm, sampleRate, hd) => {
+        if (epoch !== this.sessionEpoch) return;
+        this.onOpenWebRxAudio(pcm, sampleRate, hd);
+      },
+      onConfig: (config, resetTuning) => {
+        if (epoch !== this.sessionEpoch) return;
+        this.onOpenWebRxConfig(config, resetTuning);
+      },
+      onProfiles: (profiles) => {
+        if (epoch !== this.sessionEpoch || !this.owrxSession) return;
+        this.setOwrxSession({ ...this.owrxSession, profiles });
+      },
+      onReceiverName: (receiverName) => {
+        if (epoch !== this.sessionEpoch || !this.owrxSession) return;
+        this.setOwrxSession({ ...this.owrxSession, receiverName });
+      },
+      onServerError: (message) => {
+        if (epoch !== this.sessionEpoch) return;
+        this.patch({ error: message });
+      },
+      onClose: () => {
+        if (epoch !== this.sessionEpoch || this.owrxExpectedClose) return;
+        if (this.state.status === "starting") return;
+        this.owrxExpectedClose = true;
+        this.teardownOpenWebRx();
+        this.patch({
+          connection: "disconnected",
+          status: "error",
+          error: "OpenWebRX+ closed the connection.",
+          stereoActive: false,
+        });
+      },
+    });
+
+    this.owrx = client;
+    this.patch({
+      status: "starting",
+      error: null,
+      connection: "openwebrx",
+    });
+
+    try {
+      await client.connect(wsUrl);
+    } catch (err) {
+      if (epoch !== this.sessionEpoch) {
+        playback.close();
+        return;
+      }
+      this.owrxExpectedClose = true;
+      this.teardownOpenWebRx();
+      this.patch({
+        connection: "disconnected",
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  selectOpenWebRxProfile(profileId: string): void {
+    if (!this.owrx || !this.owrxSession) return;
+    this.setOwrxSession({ ...this.owrxSession, profileId });
+    this.signalId.reset();
+    this.owrx.selectProfile(profileId);
+  }
+
+  getOpenWebRxSession(): OpenWebRxSession | null {
+    return this.owrxSession;
+  }
+
+  subscribeOpenWebRx(listener: () => void): () => void {
+    this.owrxListeners.add(listener);
+    return () => this.owrxListeners.delete(listener);
+  }
+
   async stop(): Promise<void> {
-    if (!this.radio) return;
+    this.sessionEpoch += 1;
     this.scanner.stop();
+    if (this.owrx || this.owrxPlayback) {
+      this.patch({ status: "stopping", error: null });
+      this.owrxExpectedClose = true;
+      this.teardownOpenWebRx();
+      this.patch({
+        connection: "disconnected",
+        status: "idle",
+        stereoActive: false,
+      });
+      return;
+    }
+    if (!this.radio) return;
     this.patch({ status: "stopping", error: null });
     try {
       await this.radio.stop();
@@ -515,7 +668,24 @@ export class RadioController {
   }
 
   async setFrequency(hz: number): Promise<void> {
-    const frequencyHz = clamp(Math.round(hz), 0, 1_766_000_000);
+    const maxHz = this.owrx ? 6_000_000_000 : 1_766_000_000;
+    const frequencyHz = clamp(Math.round(hz), 0, maxHz);
+    if (this.owrx) {
+      const previous = this.state.frequencyHz;
+      if (!this.owrxSession?.allowsCenterChanges) {
+        if (Math.abs(frequencyHz - previous) > 1) {
+          this.patch({
+            error:
+              "This OpenWebRX+ profile keeps a fixed center frequency. Tune inside the spectrum window, or enable center changes on the server.",
+          });
+        }
+        return;
+      }
+      this.patch({ frequencyHz });
+      this.signalId.reset();
+      this.owrx.setCenterFrequency(frequencyHz);
+      return;
+    }
     this.patch({ frequencyHz });
     // Retuning invalidates every tracked signal and the frame history behind it.
     this.signalId.reset();
@@ -531,6 +701,12 @@ export class RadioController {
    * the rate on start, so a live session is briefly stopped and restarted.
    */
   async setSampleRate(hz: number): Promise<void> {
+    if (this.owrx) {
+      this.patch({
+        error: "Spectrum width comes from the OpenWebRX+ profile.",
+      });
+      return;
+    }
     const requested = nearestSampleRate(hz);
     if (requested === this.state.sampleRate) return;
 
@@ -576,6 +752,7 @@ export class RadioController {
     this.patch({ offsetHz });
     this.demodulator?.setFrequencyOffset(offsetHz);
     this.p25Iq.setOffsetHz(offsetHz);
+    if (this.owrx) this.pushOpenWebRxTuning(false);
   }
 
   /**
@@ -615,6 +792,7 @@ export class RadioController {
     this.patch({ volume: v });
     if (!this.digitalMute) {
       this.demodulator?.setVolume(v);
+      this.owrxPlayback?.setVolume(v);
     }
   }
 
@@ -648,6 +826,7 @@ export class RadioController {
       bandwidthHz: params.getBandwidth(),
       stereo: params.hasStereo() ? params.getStereo() : false,
     });
+    if (this.owrx) this.pushOpenWebRxTuning(false);
   }
 
   setBandwidth(hz: number): void {
@@ -662,6 +841,7 @@ export class RadioController {
     this.knownModes[next.mode.scheme] = next.mode;
     this.demodulator?.setMode(next.mode);
     this.patch({ bandwidthHz: next.getBandwidth() });
+    if (this.owrx) this.pushOpenWebRxTuning(false);
   }
 
   setSquelch(level: number): void {
@@ -845,12 +1025,13 @@ export class RadioController {
   private forceSquelchOpen(): void {
     this.squelchGate.reset();
     this.player?.setSquelched(false);
+    this.owrxPlayback?.setSquelched(false);
     if (!this.state.squelchOpen) {
       this.patch({ squelchOpen: true });
     }
   }
 
-  private evaluateSquelch(): void {
+  private evaluateSquelch(buffer: Float32Array = this.spectrumBuffer): void {
     const now = performance.now();
     const dtSeconds =
       this.lastSquelchEvalMs > 0
@@ -859,7 +1040,7 @@ export class RadioController {
     this.lastSquelchEvalMs = now;
 
     const decision = this.squelchGate.updateFromSpectrum(
-      this.spectrumBuffer,
+      buffer,
       this.state.sampleRate,
       this.state.offsetHz,
       this.state.bandwidthHz,
@@ -868,7 +1049,9 @@ export class RadioController {
       dtSeconds,
     );
 
-    this.player?.setSquelched(!decision.open);
+    const closed = !decision.open;
+    this.player?.setSquelched(closed);
+    this.owrxPlayback?.setSquelched(closed);
     if (decision.open !== this.state.squelchOpen) {
       this.patch({ squelchOpen: decision.open });
     }
@@ -918,8 +1101,9 @@ export class RadioController {
 
   private setDigitalMute(muted: boolean): void {
     this.digitalMute = muted;
-    if (!this.demodulator) return;
-    this.demodulator.setVolume(muted ? 0 : this.state.volume);
+    const volume = muted ? 0 : this.state.volume;
+    this.demodulator?.setVolume(volume);
+    this.owrxPlayback?.setVolume(volume);
   }
 
   private wantAudioTap(): boolean {
@@ -933,7 +1117,128 @@ export class RadioController {
   }
 
   private syncTapping(): void {
-    this.player?.setTapping(this.wantAudioTap());
+    const tapping = this.wantAudioTap();
+    this.player?.setTapping(tapping);
+    this.owrxPlayback?.setTapping(tapping);
+  }
+
+  private onOpenWebRxConfig(
+    config: {
+      centerFreqHz: number | null;
+      sampleRate: number | null;
+      startMod: string | null;
+      startOffsetHz: number | null;
+      allowsCenterChanges: boolean;
+      profileId: string | null;
+    },
+    resetTuning: boolean,
+  ): void {
+    const center = config.centerFreqHz ?? this.state.frequencyHz;
+    const rate = config.sampleRate ?? this.state.sampleRate;
+    let scheme = this.state.scheme;
+    let offsetHz = this.state.offsetHz;
+    let bandwidthHz = this.state.bandwidthHz;
+    if (resetTuning) {
+      scheme = schemeFromOwrx(config.startMod) ?? scheme;
+      offsetHz = config.startOffsetHz ?? 0;
+      if (!this.knownModes[scheme]) this.knownModes[scheme] = getMode(scheme);
+      const mode = this.knownModes[scheme] ?? getMode(scheme);
+      bandwidthHz = modeParameters(mode).getBandwidth();
+      const params = modeParameters(mode);
+      this.patch({
+        stereo: params.hasStereo() ? params.getStereo() : false,
+      });
+    }
+    const half = rate / 2;
+    this.patch({
+      connection: "openwebrx",
+      status: "playing",
+      frequencyHz: center,
+      sampleRate: rate,
+      scheme,
+      offsetHz: clamp(Math.round(offsetHz), -half, half),
+      bandwidthHz,
+      error: null,
+    });
+    if (this.owrxSession) {
+      this.setOwrxSession({
+        ...this.owrxSession,
+        allowsCenterChanges: config.allowsCenterChanges,
+        profileId: config.profileId ?? this.owrxSession.profileId,
+      });
+    }
+    this.pushOpenWebRxTuning(resetTuning);
+  }
+
+  private onOpenWebRxSpectrum(
+    shifted: Float32Array,
+    centerHz: number,
+    sampleRate: number,
+  ): void {
+    if (!this.owrx?.getConfig().sampleRate) return;
+    if (this.owrxSpectrum.length !== shifted.length) {
+      this.owrxSpectrum = new Float32Array(shifted.length);
+    }
+    unshiftSpectrum(shifted, this.owrxSpectrum);
+
+    if (this.squelchActive()) this.evaluateSquelch(this.owrxSpectrum);
+    if (this.signalId.getState().enabled) {
+      this.signalId.pushSpectrum(
+        this.owrxSpectrum,
+        centerHz || this.state.frequencyHz,
+        sampleRate,
+        this.state.frequencyHz,
+      );
+    }
+    for (const listener of this.spectrumListeners) {
+      listener(this.owrxSpectrum, centerHz || this.state.frequencyHz);
+    }
+  }
+
+  private onOpenWebRxAudio(
+    pcm: Int16Array,
+    sampleRate: number,
+    hd: boolean,
+  ): void {
+    const now = performance.now();
+    if (hd) this.owrxLastHdMs = now;
+    else if (now - this.owrxLastHdMs < 750) return;
+    this.owrxPlayback?.push(pcm, sampleRate);
+  }
+
+  private pushOpenWebRxTuning(restart: boolean): void {
+    if (!this.owrx) return;
+    const band = owrxBandpass(this.state.scheme, this.state.bandwidthHz);
+    this.owrx.applyTuning(
+      {
+        mod: owrxModulation(this.state.scheme),
+        offset_freq: this.state.offsetHz,
+        low_cut: band.low_cut,
+        high_cut: band.high_cut,
+      },
+      restart,
+    );
+  }
+
+  private teardownOpenWebRx(): void {
+    this.signalId.reset();
+    this.squelchGate.reset();
+    this.lastSquelchEvalMs = 0;
+    this.owrxLastHdMs = 0;
+    this.owrx?.close();
+    this.owrx = null;
+    this.owrxUntap?.();
+    this.owrxUntap = null;
+    this.owrxPlayback?.close();
+    this.owrxPlayback = null;
+    this.owrxSpectrum = new Float32Array(0);
+    this.setDigitalMute(false);
+    this.setOwrxSession(null);
+  }
+
+  private setOwrxSession(session: OpenWebRxSession | null): void {
+    this.owrxSession = session;
+    for (const listener of this.owrxListeners) listener();
   }
 
   private patch(partial: Partial<SdrState>): void {
